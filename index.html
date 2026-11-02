@@ -74,22 +74,78 @@
 
 <main id="main">
 
-  <section class="hero">
-    <div class="hero-grid">
-      <div class="hero-copy">
-        <div class="hero-kicker">Department of Mathematics · IIT Kharagpur</div>
-        <h2>Ideas in mathematics. <em>Impact beyond it.</em></h2>
-        <p>Advancing fundamental mathematics, computation and interdisciplinary research through rigorous scholarship, collaboration and education.</p>
-        <div class="hero-cta">
-          <a class="btn btn-gold" href="research.html">Explore Research →</a>
-          <a class="btn btn-ghost" href="about.html">About the Department</a>
+  <!-- ================= HERO SLIDESHOW ================= -->
+  <section class="hero" id="heroCarousel" aria-roledescription="carousel" aria-label="Department highlights">
+    <div class="hero-slides">
+
+      <!-- Slide 1 -->
+      <div class="hero-slide is-active" role="group" aria-roledescription="slide" aria-label="1 of 3">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <div class="hero-kicker">Department of Mathematics · IIT Kharagpur</div>
+            <h2>Ideas in mathematics. <em>Impact beyond it.</em></h2>
+            <p>Advancing fundamental mathematics, computation and interdisciplinary research through rigorous scholarship, collaboration and education.</p>
+            <div class="hero-cta">
+              <a class="btn btn-gold" href="research.html">Explore Research →</a>
+              <a class="btn btn-ghost" href="about.html">About the Department</a>
+            </div>
+          </div>
+          <div class="hero-media">
+            <img src="new-photo.jpg" alt="IIT Kharagpur campus">
+            <div class="hero-caption">Mathematics · Teaching · Research</div>
+          </div>
         </div>
       </div>
-      <div class="hero-media">
-        <img src="new photo.jpg" alt="IIT Kharagpur campus">
-        <div class="hero-caption">Mathematics · Teaching · Research</div>
+
+      <!-- Slide 2 -->
+      <div class="hero-slide" role="group" aria-roledescription="slide" aria-label="2 of 3">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <div class="hero-kicker">About the Department</div>
+            <h2>A broad mathematical community. <em>Within India’s first IIT.</em></h2>
+            <p>We support teaching and research across pure mathematics, applied mathematics, statistics, computation and mathematical modelling, engaging with foundational questions and problems from science, engineering and technology.</p>
+            <div class="hero-cta">
+              <a class="btn btn-gold" href="about.html">Discover the Department →</a>
+              <a class="btn btn-ghost" href="academics.html">Academic Programmes</a>
+            </div>
+          </div>
+          <div class="hero-media">
+            <!-- Swap in a different photo for this slide if you have one -->
+            <img src="new-photo.jpg" alt="IIT Kharagpur campus">
+            <div class="hero-caption">A community of scholars</div>
+          </div>
+        </div>
       </div>
+
+      <!-- Slide 3 -->
+      <div class="hero-slide" role="group" aria-roledescription="slide" aria-label="3 of 3">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <div class="hero-kicker">Research</div>
+            <h2>From theory <em>to computation.</em></h2>
+            <p>Research spans algebra and number theory, analysis and differential equations, probability and statistics, and applied and computational mathematics, with strong links to science and engineering.</p>
+            <div class="hero-cta">
+              <a class="btn btn-gold" href="research.html">Research Areas →</a>
+              <a class="btn btn-ghost" href="publications.html">Publications</a>
+            </div>
+          </div>
+          <div class="hero-media">
+            <!-- Swap in a different photo for this slide if you have one -->
+            <img src="new-photo.jpg" alt="IIT Kharagpur campus">
+            <div class="hero-caption">Research across disciplines</div>
+          </div>
+        </div>
+      </div>
+
     </div>
+
+    <div class="hero-controls">
+      <button type="button" class="hero-arrow" id="heroPrev" aria-label="Previous slide">‹</button>
+      <div class="hero-dots" id="heroDots"></div>
+      <button type="button" class="hero-arrow" id="heroNext" aria-label="Next slide">›</button>
+      <button type="button" class="hero-arrow hero-pause" id="heroPause" aria-label="Pause slideshow">❚❚</button>
+    </div>
+    <div class="hero-progress" aria-hidden="true"><span></span></div>
   </section>
 
   <section aria-label="Announcements" class="announcement">
@@ -100,24 +156,103 @@
     </div>
   </section>
 
-  <section class="welcome" id="about">
+  <!-- ================= HOD MESSAGE + NOTICE BOARD ================= -->
+  <section class="welcome" id="hod-message">
     <div class="content welcome-grid">
-      <div class="welcome-copy">
-        <div class="eyebrow">About the Department</div>
-        <h2 class="section-title">A broad mathematical community within India’s first IIT.</h2>
-        <p>The Department of Mathematics at IIT Kharagpur supports teaching and research across pure mathematics, applied mathematics, statistics, computation and mathematical modelling.</p>
-        <p>Our faculty and students engage with foundational questions as well as problems arising in science, engineering and technology, building connections across disciplines.</p>
-        <a class="link-arrow" href="about.html">Discover the Department <span>→</span></a>
+
+      <div class="hod-message">
+        <div class="eyebrow">Message from the Head</div>
+        <h2 class="section-title">Welcome to the Department of Mathematics</h2>
+
+        <div class="hod-video">
+          <video controls preload="metadata" playsinline poster="hod-poster.jpg">
+            <source src="hod-message.mp4" type="video/mp4">
+            Your browser does not support embedded video.
+          </video>
+          <!--
+          To use YouTube instead, delete the <video> above and use:
+          <iframe src="https://www.youtube-nocookie.com/embed/VIDEO_ID"
+                  title="Message from the Head of Department"
+                  allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen loading="lazy"></iframe>
+          -->
+        </div>
+
+        <!-- DRAFT TEXT: replace with the Head's approved message -->
+        <div class="hod-text" id="hodText">
+          <p>It is my pleasure to welcome you to the Department of Mathematics at IIT Kharagpur. Our department is home to a community of faculty, research scholars and students who share a commitment to rigorous mathematical thinking.</p>
+          <p>We engage with fundamental questions in pure mathematics while building strong connections with statistics, computation and the many areas of science and engineering where mathematics plays a central role.</p>
+          <p>Our academic programmes aim to give students a deep understanding of mathematical ideas together with the skills to apply them. Our research spans a wide range of areas, and we value collaboration within the institute and beyond.</p>
+          <p>I invite you to explore our website to learn more about our people, programmes, research and activities. We look forward to welcoming you to the department.</p>
+        </div>
+        <button type="button" class="hod-toggle" id="hodToggle" aria-expanded="false" aria-controls="hodText" hidden>Read full message <span aria-hidden="true">↓</span></button>
+
+        <div class="hod-sign">
+          <strong>[Name of the Head]</strong>
+          <span>Head, Department of Mathematics</span>
+        </div>
       </div>
-      <aside aria-label="Department at a glance" class="snapshot home-snapshot">
-        <h3>At a glance</h3>
-        <div class="stats">
-          <div class="stat"><strong>Pure Mathematics</strong><span>Algebra, Analysis, Number Theory</span></div>
-          <div class="stat"><strong>Applied Mathematics</strong><span>PDE, Dynamics</span></div>
-          <div class="stat"><strong>Theoretical Computer Science</strong><span>Cryptography, Operations Research</span></div>
-          <div class="stat"><strong>Statistics</strong><span>Probability, Inference</span></div>
+
+      <aside class="notice-board" id="noticeBoard" aria-labelledby="noticeTitle">
+        <div class="notice-head">
+          <h3 id="noticeTitle">Notice Board</h3>
+          <span class="live-pill"><span class="live-dot" aria-hidden="true"></span>Latest</span>
+          <button type="button" class="ticker-toggle" id="tickerToggle" aria-pressed="false" aria-label="Pause notice scrolling">❚❚</button>
+        </div>
+
+        <div class="notice-viewport" id="noticeViewport">
+          <ul class="notice-track" id="noticeTrack">
+            <!-- Copy one <li> block per notice. Delete <span class="badge-new"> for older notices. -->
+            <li class="notice-item">
+              <div class="notice-date"><strong>[DD]</strong><span>[Mon]</span></div>
+              <div class="notice-body">
+                <div class="notice-meta"><span class="notice-tag tag-seminar">Seminar</span><span class="badge-new">New</span></div>
+                <a href="news-events.html">[Seminar title] — [Speaker], [Venue], [Time]</a>
+              </div>
+            </li>
+            <li class="notice-item">
+              <div class="notice-date"><strong>[DD]</strong><span>[Mon]</span></div>
+              <div class="notice-body">
+                <div class="notice-meta"><span class="notice-tag tag-admission">Admissions</span><span class="badge-new">New</span></div>
+                <a href="academics.html#admissions">[Admission notice title for programme]</a>
+              </div>
+            </li>
+            <li class="notice-item">
+              <div class="notice-date"><strong>[DD]</strong><span>[Mon]</span></div>
+              <div class="notice-body">
+                <div class="notice-meta"><span class="notice-tag tag-exam">Examination</span></div>
+                <a href="students.html">[Course / examination schedule notice]</a>
+              </div>
+            </li>
+            <li class="notice-item">
+              <div class="notice-date"><strong>[DD]</strong><span>[Mon]</span></div>
+              <div class="notice-body">
+                <div class="notice-meta"><span class="notice-tag tag-event">Workshop</span></div>
+                <a href="news-events.html">[Workshop / conference name and details]</a>
+              </div>
+            </li>
+            <li class="notice-item">
+              <div class="notice-date"><strong>[DD]</strong><span>[Mon]</span></div>
+              <div class="notice-body">
+                <div class="notice-meta"><span class="notice-tag tag-seminar">Colloquium</span></div>
+                <a href="news-events.html">Colloquium: [Talk title] by [Speaker]</a>
+              </div>
+            </li>
+            <li class="notice-item">
+              <div class="notice-date"><strong>[DD]</strong><span>[Mon]</span></div>
+              <div class="notice-body">
+                <div class="notice-meta"><span class="notice-tag tag-general">Notice</span></div>
+                <a href="news-events.html">[General departmental notice]</a>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="notice-foot">
+          <a class="link-arrow" href="news-events.html">View all notices <span>→</span></a>
         </div>
       </aside>
+
     </div>
   </section>
 
