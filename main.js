@@ -3,7 +3,27 @@
 const pages = [
   {name:'Home',url:'index.html',words:'homepage mathematics department IIT Kharagpur welcome'},
   {name:'About',url:'about.html',words:'department overview history mathematics teaching collaborations'},
-  {name:'Research',url:'research.html',words:'algebra number theory analysis equations probability statistics applied computational mathematics'},
+  {name:'Research',url:'research.html',words:'pure applied mathematics probability statistics theoretical computer science'},
+  {name:'Research › Pure Mathematics',url:'research.html#pure-mathematics',words:'pure mathematics algebra analysis topology combinatorics number theory'},
+  {name:'Research › Algebra',url:'research.html#algebra',words:'algebra commutative homological lie associative k-theory algebraic geometry'},
+  {name:'Research › Analysis',url:'research.html#analysis',words:'analysis harmonic operator theory functional analysis geometric function theory'},
+  {name:'Research › Topology',url:'research.html#topology',words:'topology algebraic geometric topology homotopy'},
+  {name:'Research › Combinatorics & Number Theory',url:'research.html#combinatorics',words:'combinatorics graph theory matrix theory number theory zeta'},
+  {name:'Research › Applied Mathematics',url:'research.html#applied-mathematics',words:'applied mathematics fluid differential equations computing optimisation optimization'},
+  {name:'Research › Fluid Dynamics',url:'research.html#fluid-dynamics',words:'fluid dynamics biofluid microfluidics turbulence water waves porous media'},
+  {name:'Research › Differential & Integral Equations',url:'research.html#differential-equations',words:'differential integral equations pde conservation laws boundary value homogenisation'},
+  {name:'Research › Scientific Computing',url:'research.html#scientific-computing',words:'scientific computing numerical analysis finite volume linear algebra'},
+  {name:'Research › Optimisation & Operations Research',url:'research.html#optimisation',words:'optimisation optimization operations research fuzzy inventory decision'},
+  {name:'Research › Probability & Statistics',url:'research.html#probability-statistics',words:'probability statistics inference reliability data analysis'},
+  {name:'Research › Statistical Inference',url:'research.html#statistical-inference',words:'statistical inference estimation classification clinical trials surrogate'},
+  {name:'Research › Applied Probability',url:'research.html#stochastic-processes',words:'applied probability stochastic orders processes'},
+  {name:'Research › Reliability & Survival Analysis',url:'research.html#reliability-survival',words:'reliability survival analysis entropy life testing censored'},
+  {name:'Research › Data Analysis',url:'research.html#data-analysis',words:'data analysis directional statistics manifolds functional data mining'},
+  {name:'Research › Theoretical Computer Science',url:'research.html#theoretical-computer-science',words:'theoretical computer science algorithms complexity cryptography geometry blockchain'},
+  {name:'Research › Algorithms & Complexity',url:'research.html#algorithms-complexity',words:'algorithms complexity graph algorithms parameterized'},
+  {name:'Research › Cryptography',url:'research.html#cryptography',words:'cryptography encryption post-quantum cryptanalysis security'},
+  {name:'Research › Computational Geometry & Topology',url:'research.html#computational-geometry',words:'computational geometry topology visibility'},
+  {name:'Research › Blockchain & Secure Computation',url:'research.html#blockchain',words:'blockchain cryptocurrency bitcoin zero-knowledge privacy'},
   {name:'People',url:'people.html',words:'faculty research scholars staff directory'},
   {name:'Academics',url:'academics.html',words:'programmes courses undergraduate postgraduate doctoral admissions'},
   {name:'Students',url:'students.html',words:'students research scholars resources teaching seminars'},
@@ -12,6 +32,7 @@ const pages = [
   {name:'Contact',url:'contact.html',words:'address contact mathematics department Kharagpur West Bengal'},
 ];
 const nav=document.getElementById('navLinks');
+function closeDropdowns(){document.querySelectorAll('.has-dropdown.open').forEach(d=>{d.classList.remove('open');const b=d.querySelector('.dropdown-toggle');if(b)b.setAttribute('aria-expanded','false');});}
 const menu=document.getElementById('menuToggle');
 if(menu && nav){
   menu.addEventListener('click',()=>{
@@ -25,7 +46,7 @@ if(menu && nav){
     }
   });
   window.addEventListener('resize',()=>{
-    if(window.innerWidth>850){nav.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.textContent='☰';}
+    if(window.innerWidth>850){nav.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.textContent='☰';closeDropdowns();}
   });
 }
 const searchToggle=document.getElementById('searchToggle');
@@ -179,3 +200,55 @@ if(searchForm)searchForm.addEventListener('submit',e=>{e.preventDefault();render
   });
 })();
 
+// ===== Research dropdown in the main navbar =====
+(function(){
+  document.querySelectorAll('.nav-links .has-dropdown').forEach(item=>{
+    const btn=item.querySelector('.dropdown-toggle');
+    if(!btn)return;
+    const set=open=>{item.classList.toggle('open',open);btn.setAttribute('aria-expanded',String(open));};
+    btn.addEventListener('click',e=>{e.stopPropagation();set(!item.classList.contains('open'));});
+    item.addEventListener('keydown',e=>{if(e.key==='Escape'){set(false);btn.focus();}});
+    document.addEventListener('click',e=>{if(!item.contains(e.target))set(false);});
+    item.querySelectorAll('.nav-dropdown a').forEach(a=>a.addEventListener('click',()=>{
+      set(false);a.blur();
+      if(nav&&menu){nav.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.textContent='☰';}
+    }));
+  });
+})();
+
+// ===== Research page: area tabs, subtabs and topics =====
+(function(){
+  const areas=[...document.querySelectorAll('.area-panel')];
+  if(!areas.length)return;
+  const areaTabs=[...document.querySelectorAll('.area-tab')];
+  const mark=(tabs,id)=>tabs.forEach(t=>{const on=t.dataset.target===id;t.classList.toggle('is-active',on);on?t.setAttribute('aria-current','true'):t.removeAttribute('aria-current');});
+  function showArea(id,subId){
+    areas.forEach(a=>a.hidden=a.id!==id);
+    mark(areaTabs,id);
+    const panel=document.getElementById(id);
+    const subs=[...panel.querySelectorAll('.sub-panel')];
+    const sid=subId||subs[0].id;
+    subs.forEach(s=>s.hidden=s.id!==sid);
+    mark([...panel.querySelectorAll('.sub-tab')],sid);
+  }
+  function route(scroll){
+    let h='';try{h=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    let el=h?document.getElementById(h):null,topic=null,target=null;
+    if(el&&el.classList.contains('topic')){topic=el;el=el.closest('.sub-panel');}
+    if(el&&el.classList.contains('sub-panel')){showArea(el.closest('.area-panel').id,el.id);target=topic||el;}
+    else if(el&&el.classList.contains('area-panel')){showArea(el.id);target=el;}
+    else{showArea(areas[0].id);return;}
+    if(topic)topic.open=true;
+    if(scroll&&target)target.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  function go(e){
+    e.preventDefault();
+    const id=this.dataset.target;
+    history.replaceState?history.replaceState(null,'','#'+id):(location.hash=id);
+    route(this.classList.contains('area-tab'));
+  }
+  areaTabs.forEach(t=>t.addEventListener('click',go));
+  document.querySelectorAll('.sub-tab').forEach(t=>t.addEventListener('click',go));
+  window.addEventListener('hashchange',()=>route(true));
+  route(!!location.hash);
+})();
