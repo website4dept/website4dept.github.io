@@ -120,15 +120,78 @@
   }
 
   /* ---------- profile.html ---------- */
-  function listSection(title, items){
-    if (!items || !items.length) return '';
-    return '<div class="profile-block"><h3>' + esc(title) + '</h3><ul class="profile-list">' +
-           items.map(i => '<li>' + esc(i) + '</li>').join('') + '</ul></div>';
+
+  // values can be plain strings or objects; these turn either into display text
+  const str = v => v == null ? '' : String(v);
+  const join = (...parts) => parts.filter(x => str(x).trim()).join(', ');
+  const years = (a, b) => (a || b) ? esc(str(a)) + (b ? ' – ' + esc(str(b)) : (a ? ' – present' : '')) : '';
+  const link = (url, text) => url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>' : text;
+  const arr = v => Array.isArray(v) ? v.filter(x => x !== '' && x != null) : (v ? [v] : []);
+  const TBA = '<p class="profile-empty">To be added.</p>';
+
+  function block(title, inner, opts){
+    opts = opts || {};
+    if (!inner && opts.hideEmpty) return '';
+    return '<div class="profile-block"' + (opts.id ? ' id="' + opts.id + '"' : '') + '>' +
+             '<h3>' + esc(title) + (opts.count ? '<span class="block-count">' + opts.count + '</span>' : '') + '</h3>' +
+             (inner || TBA) +
+           '</div>';
   }
-  function textSection(title, text){
+  function ul(items, fmt){
+    items = arr(items);
+    if (!items.length) return '';
+    return '<ul class="profile-list">' + items.map(i => '<li>' + (typeof i === 'string' ? esc(i) : fmt(i)) + '</li>').join('') + '</ul>';
+  }
+  function paras(text){
     if (!text) return '';
-    const paras = String(text).split(/\n\s*\n/).map(t => '<p>' + esc(t) + '</p>').join('');
-    return '<div class="profile-block"><h3>' + esc(title) + '</h3><div class="prose">' + paras + '</div></div>';
+    return '<div class="prose">' + String(text).split(/\n\s*\n/).map(t => '<p>' + esc(t) + '</p>').join('') + '</div>';
+  }
+  function table(rows, head){
+    if (!rows.length) return '';
+    return '<div class="table-wrap"><table class="profile-table"><thead><tr>' + head.map(h => '<th>' + esc(h) + '</th>').join('') +
+           '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+  }
+
+  const PUB_TYPES = {journal: 'Journal articles', conference: 'Conference papers', book: 'Books', chapter: 'Book chapters', preprint: 'Preprints', other: 'Other'};
+
+  function pubHTML(x){
+    if (typeof x === 'string') return esc(x);
+    const title = x.url || x.doi ? link(x.url || ('https://doi.org/' + x.doi), esc(x.title)) : esc(x.title);
+    const where = join(x.venue && '<em>' + esc(x.venue) + '</em>', x.volume && esc('Vol. ' + x.volume), x.pages && esc('pp. ' + x.pages));
+    return '<span class="pub-authors">' + esc(x.authors) + '</span>' +
+           (x.title ? (x.authors ? ', ' : '') + '<span class="pub-title">“' + title + '”</span>' : '') +
+           (where ? ', ' + where : '') + (x.year ? ' (' + esc(x.year) + ')' : '') + '.' +
+           (x.doi ? ' <a class="pub-doi" href="https://doi.org/' + esc(x.doi) + '" target="_blank" rel="noopener noreferrer">DOI</a>' : '');
+  }
+
+  function publicationsTab(p){
+    const pubs = arr(p.publications).map(x => typeof x === 'string' ? {raw: x, type: 'other', year: (x.match(/(19|20)\d{2}/) || [''])[0]} : x);
+    if (!pubs.length) return block('Publications', '') + scholarLinks(p);
+    const typesPresent = Object.keys(PUB_TYPES).filter(t => pubs.some(x => (x.type || 'other') === t));
+    const counts = typesPresent.map(t => '<button type="button" class="pub-filter" data-type="' + t + '">' + PUB_TYPES[t] +
+                   ' <span>' + pubs.filter(x => (x.type || 'other') === t).length + '</span></button>').join('');
+    const sorted = pubs.slice().sort((a, b) => str(b.year).localeCompare(str(a.year)));
+    let lastYear = null, list = '';
+    sorted.forEach(x => {
+      const y = str(x.year) || 'Undated';
+      if (y !== lastYear){ list += '<li class="pub-year" data-year>' + esc(y) + '</li>'; lastYear = y; }
+      list += '<li class="pub-item" data-type="' + esc(x.type || 'other') + '">' + (x.raw ? esc(x.raw) : pubHTML(x)) + '</li>';
+    });
+    return '<div class="profile-block"><h3>Publications<span class="block-count">' + pubs.length + '</span></h3>' +
+             '<div class="pub-tools"><button type="button" class="pub-filter is-on" data-type="all">All <span>' + pubs.length + '</span></button>' + counts +
+             '<input type="search" class="pub-search" placeholder="Search title, author, journal…" aria-label="Search publications"></div>' +
+             '<ol class="pub-list">' + list + '</ol>' +
+           '</div>' + scholarLinks(p);
+  }
+
+  function scholarLinks(p){
+    const L = p.links || {};
+    const items = [
+      ['scholar', 'Google Scholar'], ['orcid', 'ORCID'], ['scopus', 'Scopus'], ['mathscinet', 'MathSciNet'],
+      ['dblp', 'DBLP'], ['researchgate', 'ResearchGate'], ['arxiv', 'arXiv'], ['linkedin', 'LinkedIn']
+    ].filter(([k]) => L[k]);
+    if (!items.length) return '';
+    return block('Research profiles', '<div class="pill-row">' + items.map(([k, n]) => '<a class="pill" href="' + esc(L[k]) + '" target="_blank" rel="noopener noreferrer">' + n + ' ↗</a>').join('') + '</div>');
   }
 
   function renderProfile(){
@@ -146,11 +209,18 @@
 
     document.title = p.name + ' | Department of Mathematics | IIT Kharagpur';
     document.getElementById('profileCrumb').textContent = p.name;
-
+    const isFaculty = ['faculty', 'adjunct'].includes(p.type);
     const t = titleOf(p);
+
+    /* ----- header ----- */
     let badge = '';
     if (p.status === 'former') badge = '<span class="profile-badge">Former faculty</span>';
     if (p.status === 'alumni') badge = '<span class="profile-badge">Alumni' + (p.year ? ' · ' + esc(p.year) : '') + '</span>';
+    const resp = arr(p.responsibilities);
+    const quick = [];
+    if (p.email) quick.push('<a href="mailto:' + esc(p.email) + '">✉ ' + esc(p.email) + '</a>');
+    if (p.phone) quick.push('<span>☎ ' + esc(p.phone) + '</span>');
+    if (p.office) quick.push('<span>⌂ ' + esc(p.office) + '</span>');
 
     head.innerHTML =
       '<div class="profile-head-grid">' +
@@ -159,58 +229,158 @@
           '<div class="eyebrow">' + esc(TYPE_LABELS[p.type] || 'People') + '</div>' +
           '<h2>' + esc(p.name) + '</h2>' +
           (p.head && p.status === 'current' ? '<p class="profile-role">Head of the Department</p>' : '') +
-          (t ? '<p class="profile-title">' + esc(t) + '</p>' : '') +
+          (t ? '<p class="profile-title">' + esc(t) + ', Department of Mathematics</p>' : '') +
+          (resp.length ? '<p class="profile-resp">' + resp.map(esc).join(' · ') + '</p>' : '') +
           badge +
           (p.now ? '<p class="profile-now">Now: ' + esc(p.now) + '</p>' : '') +
+          (quick.length ? '<div class="profile-quick">' + quick.join('') + '</div>' : '') +
         '</div>' +
       '</div>';
 
-    // contact card
+    /* ----- side card ----- */
     const rows = [];
     if (p.email) rows.push('<li><span>Email</span><a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a></li>');
     if (p.phone) rows.push('<li><span>Phone</span>' + esc(p.phone) + '</li>');
     if (p.office) rows.push('<li><span>Office</span>' + esc(p.office) + '</li>');
-    if (p.website) rows.push('<li><span>Website</span><a href="' + esc(p.website) + '" target="_blank" rel="noopener noreferrer">Personal page ↗</a></li>');
-    if (p.profile) rows.push('<li><span>Institute</span><a href="' + esc(p.profile) + '" target="_blank" rel="noopener noreferrer">IIT KGP profile ↗</a></li>');
-    if (p.cv) rows.push('<li><span>CV</span><a href="' + esc(p.cv) + '" target="_blank" rel="noopener noreferrer">Download CV ↗</a></li>');
+    if (p.office_hours) rows.push('<li><span>Office hours</span>' + esc(p.office_hours) + '</li>');
+    if (p.website) rows.push('<li><span>Website</span>' + link(p.website, 'Personal page ↗') + '</li>');
+    if (p.profile) rows.push('<li><span>Institute</span>' + link(p.profile, 'IIT KGP profile ↗') + '</li>');
     const sup = p.supervisor && findPerson(p.supervisor);
     if (sup) rows.push('<li><span>' + (p.type === 'postdoc' ? 'Mentor' : 'Supervisor') + '</span><a href="' + profileUrl(sup) + '">' + esc(sup.name) + '</a></li>');
     if (p.year && p.status === 'current') rows.push('<li><span>Joined</span>' + esc(p.year) + '</li>');
+    const side =
+      '<aside class="profile-side">' +
+        '<div class="surface"><h3>Contact &amp; links</h3>' +
+          (rows.length ? '<ul class="profile-contact">' + rows.join('') + '</ul>' : '<p class="muted">Contact details to be added.</p>') +
+          (p.cv ? '<a class="btn btn-maroon cv-btn" href="' + esc(p.cv) + '" target="_blank" rel="noopener noreferrer">⬇ Download CV</a>' : '') +
+        '</div>' +
+        (areaPills(p) ? '<div class="surface"><h3>Research areas</h3><div class="pill-row">' + areaPills(p) + '</div></div>' : '') +
+      '</aside>';
 
-    // students and postdocs supervised by this person
+    /* ----- tab contents ----- */
+    const edu = ul(p.education, x => '<strong>' + esc(x.degree) + '</strong>' + (x.subject ? ' in ' + esc(x.subject) : '') +
+                     (x.institution ? ', ' + esc(x.institution) : '') + (x.year ? ' (' + esc(x.year) + ')' : '') +
+                     (x.thesis ? '<span class="sub">Thesis: ' + esc(x.thesis) + '</span>' : ''));
+    const exp = ul(p.experience, x => '<strong>' + esc(x.position) + '</strong>' + (x.organisation ? ', ' + esc(x.organisation) : '') +
+                     (x.from || x.to ? ' <span class="muted">(' + years(x.from, x.to) + ')</span>' : ''));
+    const awards = ul(p.awards, x => '<strong>' + esc(x.title) + '</strong>' + (x.body ? ', ' + esc(x.body) : '') + (x.year ? ' (' + esc(x.year) + ')' : ''));
+    const memberships = ul(p.memberships, x => esc(x.name || x.title) + (x.role ? ' – ' + esc(x.role) : ''));
+
+    const ongoing = arr(p.projects).filter(x => typeof x !== 'string' && x.status !== 'completed');
+    const completed = arr(p.projects).filter(x => typeof x !== 'string' && x.status === 'completed');
+    const projTable = list => table(list.map(x => ['<strong>' + esc(x.title) + '</strong>', esc(x.agency), esc(x.role), years(x.from, x.to), esc(x.amount || '')]),
+                                    ['Project', 'Funding agency', 'Role', 'Duration', 'Amount']);
+    const patents = ul(p.patents, x => '<strong>' + esc(x.title) + '</strong>' + (x.number ? ', ' + esc(x.number) : '') + (x.status ? ' – ' + esc(x.status) : '') + (x.year ? ' (' + esc(x.year) + ')' : ''));
+    const consultancy = ul(p.consultancy, x => '<strong>' + esc(x.title) + '</strong>' + (x.client ? ', ' + esc(x.client) : '') + (x.from || x.to ? ' (' + years(x.from, x.to) + ')' : ''));
+
+    // students: people in the data file who list this person as supervisor + any extra entries
     const supervised = PEOPLE.filter(x => x.supervisor === p.id);
-    const curStudents = supervised.filter(x => x.status === 'current').sort(byName);
-    const pastStudents = supervised.filter(x => x.status === 'alumni').sort(byName);
-    const peopleList = (title, list) => list.length ?
-      '<div class="profile-block"><h3>' + esc(title) + '</h3><ul class="profile-list">' +
-      list.map(x => '<li><a href="' + profileUrl(x) + '">' + esc(x.name) + '</a> <span class="muted">· ' + esc(titleOf(x)) + (x.year ? ', ' + esc(x.year) : '') + '</span></li>').join('') +
-      '</ul></div>' : '';
+    const extra = arr(p.students);
+    const studentRows = (status, level) => {
+      const fromData = supervised.filter(x => (status === 'current' ? x.status === 'current' : x.status === 'alumni') &&
+                                              (level === 'postdoc' ? x.type === 'postdoc' : x.type === 'scholar'))
+        .map(x => ['<a href="' + profileUrl(x) + '">' + esc(x.name) + '</a>', esc((x.areas || []).map(a => AREAS[a]).filter(Boolean).join(', ') || x.topic || ''), esc(x.year || ''), esc(x.now || '')]);
+      const fromExtra = extra.filter(x => (x.status || 'current') === status && (x.level || 'PhD').toLowerCase() === (level === 'postdoc' ? 'postdoc' : 'phd'))
+        .map(x => [esc(x.name), esc(x.topic || ''), esc(x.year || ''), esc(x.now || '')]);
+      return fromData.concat(fromExtra);
+    };
+    const masters = extra.filter(x => !['phd', 'postdoc'].includes((x.level || 'PhD').toLowerCase()))
+      .map(x => [esc(x.name), esc(x.level), esc(x.topic || ''), esc(x.year || '')]);
+    const sCurPhd = studentRows('current', 'phd'), sOldPhd = studentRows('graduated', 'phd').concat(studentRows('alumni', 'phd'));
+    const sPd = studentRows('current', 'postdoc').concat(studentRows('graduated', 'postdoc'), studentRows('alumni', 'postdoc'));
 
-    const pills = areaPills(p);
-    const main =
-      (pills ? '<div class="profile-block"><h3>Research areas</h3><div class="pill-row">' + pills + '</div></div>' : '') +
-      textSection('About', p.bio) +
-      textSection('Research interests', p.interests) +
-      listSection('Education', p.education) +
-      listSection('Selected publications', p.publications) +
-      peopleList('Current students & postdocs', curStudents) +
-      peopleList('Former students & postdocs', pastStudents);
+    const teachRows = arr(p.teaching).map(x => typeof x === 'string' ? [esc(x), '', '', ''] :
+      ['<strong>' + esc(x.code || '') + '</strong>', esc(x.title), esc(x.level || ''), esc(x.semester || '')]);
 
-    const empty = !main && !rows.length;
+    const talks = ul(p.talks, x => '<strong>' + esc(x.title) + '</strong>' + (x.event ? ', ' + esc(x.event) : '') + (x.place ? ', ' + esc(x.place) : '') + (x.date ? ' (' + esc(x.date) + ')' : ''));
+    const editorial = ul(p.editorial, x => esc(x.role) + (x.journal ? ', <em>' + esc(x.journal) + '</em>' : '') + (x.from || x.to ? ' (' + years(x.from, x.to) + ')' : ''));
+    const organised = ul(p.events, x => '<strong>' + esc(x.title) + '</strong>' + (x.role ? ' – ' + esc(x.role) : '') + (x.date ? ' (' + esc(x.date) + ')' : ''));
+    const visits = ul(p.visits, x => esc(x.institution) + (x.place ? ', ' + esc(x.place) : '') + (x.date ? ' (' + esc(x.date) + ')' : ''));
+    const admin = ul(p.admin, x => esc(x.role) + (x.from || x.to ? ' <span class="muted">(' + years(x.from, x.to) + ')</span>' : ''));
+    const collab = ul(p.collaborators, x => esc(x.name) + (x.institution ? ', ' + esc(x.institution) : ''));
+
+    const isStudent = ['scholar', 'postdoc'].includes(p.type);
+    const tabs = [
+      {id: 'overview', label: 'Overview', html:
+        block('About', paras(p.bio)) +
+        block('Research interests', paras(p.interests)) +
+        block('Education', edu) +
+        block('Professional experience', exp, {hideEmpty: isStudent}) +
+        block('Awards & honours', awards) +
+        block('Professional memberships', memberships, {hideEmpty: isStudent})},
+      {id: 'publications', label: 'Publications', html: publicationsTab(p)},
+      {id: 'projects', label: 'Research & Projects', html:
+        block('Ongoing sponsored projects', projTable(ongoing)) +
+        block('Completed sponsored projects', projTable(completed)) +
+        block('Consultancy', consultancy, {hideEmpty: isStudent}) +
+        block('Patents', patents, {hideEmpty: true}) +
+        block('Collaborators', collab, {hideEmpty: true})},
+      {id: 'students', label: 'Students', hide: !isFaculty, html:
+        block('Current Ph.D. scholars', table(sCurPhd, ['Name', 'Research area', 'Joined', '']), {count: sCurPhd.length || ''}) +
+        block('Ph.D. graduated', table(sOldPhd, ['Name', 'Thesis / area', 'Year', 'Current position']), {count: sOldPhd.length || ''}) +
+        block('Postdoctoral fellows', table(sPd, ['Name', 'Research area', 'Year', 'Current position']), {count: sPd.length || ''}) +
+        block('Master’s & BS-MS projects', table(masters, ['Name', 'Programme', 'Project', 'Year']), {count: masters.length || ''})},
+      {id: 'teaching', label: 'Teaching', hide: !isFaculty, html:
+        block('Courses taught', table(teachRows, ['Code', 'Course', 'Level', 'Semester'])) +
+        block('Teaching material & notes', ul(p.materials, x => link(x.url, esc(x.title))), {hideEmpty: true})},
+      {id: 'activities', label: 'Activities', html:
+        block('Administrative responsibilities', admin || ul(resp, x => esc(x))) +
+        block('Invited talks', talks) +
+        block('Editorial & review work', editorial) +
+        block('Conferences & workshops organised', organised) +
+        block('Academic visits', visits, {hideEmpty: true})}
+    ].filter(tb => !tb.hide);
 
     body.innerHTML =
+      '<div class="profile-tabs" role="tablist" aria-label="Profile sections">' +
+        tabs.map(tb => '<a class="profile-tab" role="tab" href="#' + tb.id + '" data-tab="' + tb.id + '" aria-controls="tab-' + tb.id + '">' + esc(tb.label) + '</a>').join('') +
+      '</div>' +
       '<div class="profile-layout">' +
         '<div class="profile-main">' +
-          (main || '') +
-          (empty || (!p.bio && !p.publications?.length) ?
-            '<div class="notice-box"><strong>Profile being updated.</strong> Biography, publications and CV will be added here.</div>' : '') +
-          '<p><a class="link-arrow" href="people.html#' + esc(p.id) + '">← Back to people directory</a></p>' +
-        '</div>' +
-        '<aside class="surface profile-side"><h3>Contact &amp; links</h3>' +
-          (rows.length ? '<ul class="profile-contact">' + rows.join('') + '</ul>'
-                       : '<p class="muted">Contact details to be added.</p>') +
-        '</aside>' +
+          tabs.map(tb => '<section class="profile-panel" role="tabpanel" id="tab-' + tb.id + '" data-panel="' + tb.id + '">' + tb.html + '</section>').join('') +
+          '<p class="profile-back"><a class="link-arrow" href="people.html#' + esc(p.id) + '">← Back to people directory</a>' +
+          (p.updated ? '<span class="muted">Last updated: ' + esc(p.updated) + '</span>' : '') + '</p>' +
+        '</div>' + side +
       '</div>';
+
+    /* ----- tab switching (remembers the tab in the address, e.g. #publications) ----- */
+    const showTab = name => {
+      if (!tabs.some(tb => tb.id === name)) name = tabs[0].id;
+      body.querySelectorAll('.profile-tab').forEach(a => {
+        const on = a.dataset.tab === name;
+        a.classList.toggle('is-active', on); a.setAttribute('aria-selected', String(on));
+      });
+      body.querySelectorAll('.profile-panel').forEach(s => { s.hidden = s.dataset.panel !== name; });
+    };
+    body.querySelectorAll('.profile-tab').forEach(a => a.addEventListener('click', e => {
+      e.preventDefault(); history.replaceState(null, '', location.search + '#' + a.dataset.tab); showTab(a.dataset.tab);
+    }));
+    showTab(location.hash.slice(1));
+
+    /* ----- publication filter + search ----- */
+    const tools = body.querySelector('.pub-tools');
+    if (tools){
+      let type = 'all';
+      const search = tools.querySelector('.pub-search');
+      const apply = () => {
+        const q = search.value.trim().toLowerCase();
+        const items = [...body.querySelectorAll('.pub-list li')];
+        let headerEl = null, visibleInYear = 0;
+        const closeYear = () => { if (headerEl) headerEl.hidden = visibleInYear === 0; };
+        items.forEach(li => {
+          if (li.hasAttribute('data-year')){ closeYear(); headerEl = li; visibleInYear = 0; return; }
+          const ok = (type === 'all' || li.dataset.type === type) && (!q || li.textContent.toLowerCase().includes(q));
+          li.hidden = !ok; if (ok) visibleInYear++;
+        });
+        closeYear();
+      };
+      tools.querySelectorAll('.pub-filter').forEach(b => b.addEventListener('click', () => {
+        type = b.dataset.type;
+        tools.querySelectorAll('.pub-filter').forEach(x => x.classList.toggle('is-on', x === b));
+        apply();
+      }));
+      search.addEventListener('input', apply);
+    }
   }
 
   renderDirectory();
