@@ -26,7 +26,10 @@
   };
 
   function titleOf(p){
-    if (p.type === 'faculty') return FACULTY_TITLES[p.designation] || '';
+    if (p.type === 'faculty'){
+      const t = FACULTY_TITLES[p.designation] || '';
+      return t && p.grade ? t + ' ' + p.grade : t;
+    }
     return p.designation || TYPE_LABELS[p.type] || '';
   }
 
@@ -168,6 +171,7 @@
     if (p.phone) rows.push('<li><span>Phone</span>' + esc(p.phone) + '</li>');
     if (p.office) rows.push('<li><span>Office</span>' + esc(p.office) + '</li>');
     if (p.website) rows.push('<li><span>Website</span><a href="' + esc(p.website) + '" target="_blank" rel="noopener noreferrer">Personal page ↗</a></li>');
+    if (p.profile) rows.push('<li><span>Institute</span><a href="' + esc(p.profile) + '" target="_blank" rel="noopener noreferrer">IIT KGP profile ↗</a></li>');
     if (p.cv) rows.push('<li><span>CV</span><a href="' + esc(p.cv) + '" target="_blank" rel="noopener noreferrer">Download CV ↗</a></li>');
     const sup = p.supervisor && findPerson(p.supervisor);
     if (sup) rows.push('<li><span>' + (p.type === 'postdoc' ? 'Mentor' : 'Supervisor') + '</span><a href="' + profileUrl(sup) + '">' + esc(sup.name) + '</a></li>');
