@@ -666,7 +666,6 @@ footer{background:#0d2028;color:#fff}
 @media(max-width:1100px){.faculty-grid,.program-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.faculty-grid,.program-grid{grid-template-columns:1fr}}
 
-
 /* =========================================================
    Homepage v4: compact hero, ticker, notices + events,
    key numbers, compact HOD message, highlights, visit us
@@ -808,4 +807,72 @@ footer{background:#0d2028;color:#fff}
 }
 @media(prefers-reduced-motion:reduce){
   .news-ticker.is-moving .news-ticker-track{animation:none}
+}
+
+/* =========================================================
+   People directory (people.html) and profiles (profile.html)
+   ========================================================= */
+.people-group{margin-top:40px}
+.people-group:first-child{margin-top:28px}
+.people-group-title{display:flex;align-items:center;gap:12px;font-family:"Libre Baskerville",serif;font-size:21px;color:var(--ink);padding-bottom:12px;margin-bottom:20px;border-bottom:1px solid var(--line);position:relative}
+.people-group-title::after{content:"";position:absolute;left:0;bottom:-1px;width:64px;height:2px;background:var(--gold)}
+.people-group-title span{font-family:"DM Sans",sans-serif;font-size:11px;font-weight:800;color:var(--maroon);background:#f6e9eb;padding:3px 9px;letter-spacing:.5px}
+.people-group-note{font-size:13px;color:var(--muted);margin:-8px 0 18px}
+
+.person-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}
+.person-card{background:#fff;border:1px solid var(--line);border-top:3px solid var(--maroon);display:flex;flex-direction:column;scroll-margin-top:90px;transition:box-shadow .2s,transform .2s,border-color .2s}
+.person-card:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
+.person-card:target{border-color:var(--maroon);box-shadow:0 0 0 3px rgba(111,29,42,.15),var(--shadow)}
+.person-photo-link{display:block}
+.person-photo,.profile-photo{position:relative;background:linear-gradient(150deg,var(--maroon),var(--maroon-dark));overflow:hidden}
+.person-photo{aspect-ratio:1/1}
+.person-photo img,.profile-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;transition:transform .5s}
+.person-card:hover .person-photo img{transform:scale(1.04)}
+.person-photo.no-photo::after,.profile-photo.no-photo::after{content:attr(data-initials);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:"Libre Baskerville",serif;color:rgba(241,202,124,.9);font-size:46px;letter-spacing:2px}
+.person-info{padding:16px 18px 18px;display:flex;flex-direction:column;flex:1}
+.person-info h3{font:700 17px/1.3 "Libre Baskerville",serif;margin-bottom:6px}
+.person-info h3 a{color:var(--ink)}
+.person-info h3 a:hover{color:var(--maroon)}
+.person-role{display:block;font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);margin-bottom:3px}
+.person-title{display:block;font-size:13px;font-weight:600;color:var(--maroon);margin-bottom:4px}
+.person-meta{display:block;font-size:12.5px;color:var(--muted);margin-bottom:2px}
+.person-meta a{color:var(--blue);font-weight:600}
+.person-info .pill-row{margin-top:10px;gap:6px}
+.person-info .pill{padding:5px 9px;font-size:11px}
+.pill-more{background:#fff;color:var(--muted)}
+.person-more{margin-top:auto;padding-top:14px;font-size:12.5px;font-weight:700;color:var(--maroon)}
+
+/* profile page */
+.profile-head-grid{display:grid;grid-template-columns:180px 1fr;gap:36px;align-items:center}
+.profile-photo{aspect-ratio:4/5;border:3px solid rgba(241,202,124,.6);box-shadow:0 18px 40px rgba(0,0,0,.25)}
+.profile-head h2{margin-bottom:8px}
+.profile-role{font-size:12px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:#f2cc82;margin:0 0 4px}
+.profile-title{font-size:17px;color:rgba(255,255,255,.88);margin:0 0 10px}
+.profile-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;background:#f2cc82;color:#3a2a10;padding:4px 10px}
+.profile-now{font-size:14px;color:rgba(255,255,255,.8);margin-top:10px}
+.profile-layout{display:grid;grid-template-columns:1fr 340px;gap:48px;align-items:start}
+.profile-block{margin-bottom:34px}
+.profile-block h3{font-family:"Libre Baskerville",serif;font-size:20px;color:var(--ink);padding-bottom:10px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.profile-list{list-style:none;padding:0;margin:0}
+.profile-list li{padding:10px 0 10px 18px;border-bottom:1px dashed #e3e6e8;position:relative;color:#444b51;font-size:15px;line-height:1.6}
+.profile-list li::before{content:"";position:absolute;left:0;top:19px;width:7px;height:7px;background:var(--gold)}
+.profile-list a{color:var(--maroon);font-weight:600}
+.muted{color:var(--muted)}
+.profile-side{position:sticky;top:90px}
+.profile-contact{list-style:none;padding:0;margin:14px 0 0}
+.profile-contact li{display:grid;grid-template-columns:86px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid #eef0f1;font-size:14px;word-break:break-word}
+.profile-contact li span{font-size:10.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);padding-top:2px}
+.profile-contact a{color:var(--maroon);font-weight:600}
+
+@media(max-width:1100px){.person-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:850px){
+  .person-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .profile-layout{grid-template-columns:1fr}
+  .profile-side{position:static}
+}
+@media(max-width:600px){
+  .person-grid{gap:12px}
+  .person-info{padding:12px 13px 14px}
+  .person-info h3{font-size:15px}
+  .profile-head-grid{grid-template-columns:110px 1fr;gap:20px}
 }
