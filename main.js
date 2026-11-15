@@ -252,3 +252,11 @@ if(searchForm)searchForm.addEventListener('submit',e=>{e.preventDefault();render
   window.addEventListener('hashchange',()=>route(true));
   route(!!location.hash);
 })();
+
+// ===== Highlight the current page in the navbar =====
+(function(){
+  const file=(location.pathname.split('/').pop()||'index.html').toLowerCase();
+  document.querySelectorAll('#navLinks > a, #navLinks > .has-dropdown > a').forEach(a=>{
+    if((a.getAttribute('href')||'').toLowerCase()===file){a.classList.add('active');a.setAttribute('aria-current','page');}
+  });
+})();
