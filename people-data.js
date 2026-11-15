@@ -4,33 +4,68 @@
    Everything on people.html and every profile page (profile.html?id=…)
    is built from this one list. Change a person here and every page updates.
 
-   FIELDS
-   id           unique, lowercase-with-dashes. Used in the profile link:
-                profile.html?id=adrijit-goswami
+   FIELDS  (every field is optional except id, name, type, status;
+            an empty field shows "To be added." on the profile page)
+
+   BASIC
+   id           unique, lowercase-with-dashes; used in profile.html?id=…
    name         full name as it should appear
    type         "faculty" | "adjunct" | "postdoc" | "scholar" | "staff"
-   designation  faculty only: "professor" | "associate-professor" |
-                "assistant-professor"   (leave "" if not yet confirmed)
-                adjunct/postdoc/scholar/staff: any text, e.g. "INSPIRE Faculty",
-                "NBHM Postdoctoral Fellow", "Ph.D. Scholar", "Technical Officer"
+   designation  faculty: "professor" | "associate-professor" | "assistant-professor"
+                others: any text, e.g. "NBHM Postdoctoral Fellow", "Ph.D. Scholar"
    grade        optional, e.g. "Grade-I" (shown after Assistant Professor)
-   head         true for the current Head of the Department (one person only)
-   status       "current"  – shown in their normal section
-                "former"   – faculty/adjunct/staff who retired or left
-                             (moves automatically to Former Faculty)
-                "alumni"   – postdocs/scholars who completed
-                             (moves automatically to Alumni)
-   photo        leave "" to use photos/<id>.jpg  (upload that file to change
-                the photo everywhere). Or give any other path or URL.
-   areas        research subarea ids from research.html (see AREAS below)
-   supervisor   scholars/postdocs: the id of their faculty mentor
-   year         scholars/postdocs: joining year; for alumni, year completed
-   now          alumni/former: current position (optional)
-   email, office, phone, website, cv   contact and links ("" = hidden)
-   profile      official IIT Kharagpur profile page (shown as a link)
-   bio, interests                       paragraphs of text
-   education    list of strings, e.g. ["Ph.D., IIT Kharagpur (2010)"]
-   publications list of strings (one publication per string)
+   head         true for the current Head of the Department
+   status       "current" | "former" (moves to Former Faculty) |
+                "alumni" (scholars/postdocs, moves to Alumni)
+   photo        "" = photos/<id>.jpg ; or any other path/URL
+   updated      date the profile was last updated, e.g. "Nov 2026"
+
+   CONTACT & LINKS
+   email, phone, office, office_hours, website, cv (path to PDF), profile (IIT KGP page)
+   links        {"scholar":"", "orcid":"", "scopus":"", "mathscinet":"", "dblp":"",
+                 "researchgate":"", "arxiv":"", "linkedin":""}
+
+   OVERVIEW TAB
+   responsibilities  ["Head, Mathematics", "Warden, …"]   (shown under the name)
+   bio, interests    text; separate paragraphs with a blank line (\n\n)
+   areas        research subarea ids (see DEPT_AREAS below)
+   education    [{"degree":"Ph.D.", "subject":"Mathematics", "institution":"…", "year":"2010", "thesis":"…"}]
+   experience   [{"position":"Associate Professor", "organisation":"IIT Kharagpur", "from":"2015", "to":"2021"}]
+   awards       [{"title":"…", "body":"awarding body", "year":"2022"}]
+   memberships  [{"name":"Indian Mathematical Society", "role":"Life Member"}]
+
+   PUBLICATIONS TAB
+   publications [{"type":"journal"|"conference"|"book"|"chapter"|"preprint",
+                  "authors":"A. Author, B. Author", "title":"…", "venue":"Journal name",
+                  "volume":"12", "pages":"1-20", "year":"2024", "doi":"10.xxxx/…", "url":""}]
+
+   RESEARCH & PROJECTS TAB
+   projects     [{"title":"…", "agency":"SERB/ANRF", "role":"PI", "from":"2023", "to":"2026",
+                  "amount":"₹ 30 lakh", "status":"ongoing"|"completed"}]
+   consultancy  [{"title":"…", "client":"…", "from":"", "to":""}]
+   patents      [{"title":"…", "number":"…", "status":"Granted", "year":""}]
+   collaborators [{"name":"…", "institution":"…"}]
+
+   STUDENTS TAB  (scholars/postdocs in this file whose "supervisor" is this id
+                  appear automatically; add others here)
+   students     [{"name":"…", "level":"PhD"|"Postdoc"|"M.Sc."|"M.Tech."|"BS-MS",
+                  "topic":"…", "year":"2024", "status":"current"|"graduated", "now":"…"}]
+
+   TEACHING TAB
+   teaching     [{"code":"MA10001", "title":"Mathematics-I", "level":"UG", "semester":"Autumn 2025"}]
+   materials    [{"title":"Lecture notes", "url":"…"}]
+
+   ACTIVITIES TAB
+   admin        [{"role":"Head of the Department", "from":"2024", "to":""}]
+   talks        [{"title":"…", "event":"…", "place":"…", "date":"Jan 2025"}]
+   editorial    [{"role":"Associate Editor", "journal":"…", "from":"", "to":""}]
+   events       [{"title":"…", "role":"Convener", "date":"Dec 2024"}]
+   visits       [{"institution":"…", "place":"…", "date":"…"}]
+
+   SCHOLARS & POSTDOCS ONLY
+   supervisor   id of the faculty supervisor / mentor
+   year         joining year; for alumni, year completed
+   now          alumni/former: current position
    ===================================================================== */
 
 window.DEPT_AREAS = {
@@ -95,6 +130,34 @@ window.DEPT_PEOPLE = [
   {"id": "swanand-ravindra-khare", "name": "Swanand Ravindra Khare", "type": "faculty", "designation": "associate-professor", "grade": "", "head": false, "status": "current", "photo": "", "areas": ["scientific-computing"], "email": "", "office": "", "phone": "", "website": "", "cv": "", "profile": "https://www.iitkgp.ac.in/department/MA/faculty/ma-srkhare", "bio": "", "education": [], "interests": "", "publications": []},
   {"id": "swarup-kumar-panda", "name": "Swarup Kumar Panda", "type": "faculty", "designation": "associate-professor", "grade": "", "head": false, "status": "current", "photo": "", "areas": ["combinatorics"], "email": "", "office": "", "phone": "", "website": "", "cv": "", "profile": "https://www.iitkgp.ac.in/department/MA/faculty/ma-spanda", "bio": "", "education": [], "interests": "", "publications": []},
   {"id": "t-raja-sekhar", "name": "T Raja Sekhar", "type": "faculty", "designation": "professor", "grade": "", "head": false, "status": "current", "photo": "", "areas": ["differential-equations"], "email": "", "office": "", "phone": "", "website": "", "cv": "", "profile": "https://www.iitkgp.ac.in/department/MA/faculty/ma-trajasekhar", "bio": "", "education": [], "interests": "", "publications": []},
+
+  /* ---------------- SAMPLE PROFILE (not listed anywhere) ----------------
+     Open profile.html?id=sample-profile to see how a fully filled profile looks.
+     Copy its fields when filling in a real person. Delete it when no longer needed. */
+  {"id":"sample-profile","name":"Sample Faculty Member","type":"faculty","designation":"associate-professor","grade":"","head":false,"status":"sample","photo":"","updated":"Nov 2026",
+   "email":"name@maths.iitkgp.ac.in","phone":"+91-3222-28XXXX","office":"Room XXX, Department of Mathematics","office_hours":"Tue & Thu, 3–4 pm",
+   "website":"https://example.org","cv":"","profile":"",
+   "links":{"scholar":"https://scholar.google.com","orcid":"https://orcid.org","mathscinet":"https://mathscinet.ams.org"},
+   "responsibilities":["Faculty Advisor, M.Sc. Mathematics"],
+   "areas":["algebra","combinatorics"],
+   "bio":"This is a sample biography. Write two or three short paragraphs about your background and research.\n\nThe second paragraph can describe current work, collaborations or the kind of students you are looking for.",
+   "interests":"Commutative algebra, homological methods, combinatorial algebra.",
+   "education":[{"degree":"Ph.D.","subject":"Mathematics","institution":"Sample Institute","year":"2010","thesis":"Title of the doctoral thesis"},{"degree":"M.Sc.","subject":"Mathematics","institution":"Sample University","year":"2005"}],
+   "experience":[{"position":"Associate Professor","organisation":"IIT Kharagpur","from":"2021","to":""},{"position":"Assistant Professor","organisation":"IIT Kharagpur","from":"2015","to":"2021"},{"position":"Postdoctoral Fellow","organisation":"Sample Institute","from":"2010","to":"2015"}],
+   "awards":[{"title":"Sample Young Scientist Award","body":"Sample Academy","year":"2019"}],
+   "memberships":[{"name":"Sample Mathematical Society","role":"Life Member"}],
+   "publications":[
+     {"type":"journal","authors":"S. Faculty, A. Coauthor","title":"A sample journal article title","venue":"Journal of Sample Mathematics","volume":"12","pages":"1-20","year":"2025","doi":"10.0000/sample.2025"},
+     {"type":"journal","authors":"S. Faculty","title":"Another sample article","venue":"Sample Mathematical Journal","volume":"8","pages":"100-118","year":"2023"},
+     {"type":"conference","authors":"S. Faculty, B. Student","title":"A sample conference paper","venue":"Proceedings of the Sample Conference","pages":"55-66","year":"2024"},
+     {"type":"preprint","authors":"S. Faculty, C. Student","title":"A sample preprint","venue":"arXiv:0000.00000","year":"2026","url":"https://arxiv.org"}],
+   "projects":[{"title":"Sample research project title","agency":"SERB/ANRF","role":"PI","from":"2024","to":"2027","amount":"₹ 30 lakh","status":"ongoing"},{"title":"Earlier sample project","agency":"NBHM","role":"Co-PI","from":"2019","to":"2022","status":"completed"}],
+   "students":[{"name":"Sample Scholar One","level":"PhD","topic":"Sample research topic","year":"2023","status":"current"},{"name":"Sample Graduate","level":"PhD","topic":"Sample thesis title","year":"2022","status":"graduated","now":"Assistant Professor, Sample University"},{"name":"Sample M.Sc. Student","level":"M.Sc.","topic":"Sample project title","year":"2025"}],
+   "teaching":[{"code":"MA10001","title":"Mathematics-I","level":"UG","semester":"Autumn 2025"},{"code":"MA60000","title":"Sample Postgraduate Course","level":"PG","semester":"Spring 2025"}],
+   "admin":[{"role":"Faculty Advisor, M.Sc. Mathematics","from":"2024","to":""}],
+   "talks":[{"title":"Sample invited talk","event":"Sample Conference 2025","place":"Sample City","date":"Jan 2025"}],
+   "editorial":[{"role":"Reviewer","journal":"Mathematical Reviews (MathSciNet)"}],
+   "events":[{"title":"Sample Workshop on Algebra","role":"Convener","date":"Dec 2024"}]},
 
   /* ---------------- ADJUNCT & INSPIRE FACULTY ----------------
      Example (remove the slash-star comment marks to use):

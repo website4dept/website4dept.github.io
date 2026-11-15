@@ -266,6 +266,8 @@
     const awards = ul(p.awards, x => '<strong>' + esc(x.title) + '</strong>' + (x.body ? ', ' + esc(x.body) : '') + (x.year ? ' (' + esc(x.year) + ')' : ''));
     const memberships = ul(p.memberships, x => esc(x.name || x.title) + (x.role ? ' – ' + esc(x.role) : ''));
 
+    const projRows = arr(p.projects).map(x => typeof x === 'string' ? [esc(x), '', '', '', ''] :
+      ['<strong>' + esc(x.title) + '</strong>', esc(x.agency), esc(x.role), years(x.from, x.to), esc(x.amount || '')]);
     const ongoing = arr(p.projects).filter(x => typeof x !== 'string' && x.status !== 'completed');
     const completed = arr(p.projects).filter(x => typeof x !== 'string' && x.status === 'completed');
     const projTable = list => table(list.map(x => ['<strong>' + esc(x.title) + '</strong>', esc(x.agency), esc(x.role), years(x.from, x.to), esc(x.amount || '')]),
@@ -311,7 +313,7 @@
       {id: 'publications', label: 'Publications', html: publicationsTab(p)},
       {id: 'projects', label: 'Research & Projects', html:
         block('Ongoing sponsored projects', projTable(ongoing)) +
-        block('Completed sponsored projects', projTable(completed)) +
+        block('Completed sponsored projects', projTable(completed), {hideEmpty: !completed.length && !ongoing.length ? false : false}) +
         block('Consultancy', consultancy, {hideEmpty: isStudent}) +
         block('Patents', patents, {hideEmpty: true}) +
         block('Collaborators', collab, {hideEmpty: true})},
