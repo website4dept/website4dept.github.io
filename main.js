@@ -319,3 +319,80 @@ if(searchForm)searchForm.addEventListener('submit',e=>{e.preventDefault();render
     if((a.getAttribute('href')||'').toLowerCase()===file){a.classList.add('active');a.setAttribute('aria-current','page');}
   });
 })();
+
+
+// ===== Homepage: "Latest" ticker, filled from the top 3 Notice Board items =====
+(function(){
+  const ticker=document.getElementById('newsTicker');
+  const track=document.getElementById('newsTickerTrack');
+  const source=document.getElementById('noticeTrack');
+  if(!ticker||!track||!source)return;
+  const items=[...source.querySelectorAll('.notice-item:not([aria-hidden])')].slice(0,3);
+  if(!items.length){ticker.hidden=true;return;}
+  const build=hidden=>items.forEach(li=>{
+    const link=li.querySelector('.notice-body a');
+    const tag=li.querySelector('.notice-tag');
+    const isNew=li.querySelector('.badge-new');
+    const span=document.createElement('span');
+    span.className='news-ticker-item';
+    if(hidden)span.setAttribute('aria-hidden','true');
+    if(tag){const t=tag.cloneNode(true);span.append(t);}
+    if(isNew){const n=isNew.cloneNode(true);span.append(n);}
+    const a=document.createElement('a');
+    a.href=link?link.getAttribute('href'):'news-events.html';
+    a.textContent=link?link.textContent.trim():'';
+    if(hidden)a.tabIndex=-1;
+    span.append(a);
+    track.append(span);
+  });
+  build(false);
+  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const viewport=track.parentElement;
+  if(reduce||track.scrollWidth<=viewport.clientWidth)return;
+  build(true); // second copy for a seamless loop
+  ticker.style.setProperty('--news-duration',Math.max(25,track.scrollWidth/2/60)+'s');
+  ticker.classList.add('is-moving');
+})();
+
+// ===== Homepage: key numbers count up when they come into view =====
+(function(){
+  const nums=document.querySelectorAll('.stat-item strong[data-count]');
+  if(!nums.length||!('IntersectionObserver' in window))return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const run=el=>{
+    const end=parseInt(el.dataset.count,10);
+    const start=end>1000?end-60:0;
+    const t0=performance.now(),dur=1400;
+    const step=t=>{
+      const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);
+      el.textContent=Math.round(start+(end-start)*e);
+      if(p<1)requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  const io=new IntersectionObserver(entries=>entries.forEach(en=>{
+    if(en.isIntersecting){run(en.target);io.unobserve(en.target);}
+  }),{threshold:.6});
+  nums.forEach(n=>io.observe(n));
+})();
+
+// ===== Homepage: pop-ups for the Head's full message and video =====
+(function(){
+  document.querySelectorAll('[data-open]').forEach(btn=>{
+    const dlg=document.getElementById(btn.dataset.open);
+    if(!dlg)return;
+    btn.addEventListener('click',()=>{
+      if(typeof dlg.showModal==='function')dlg.showModal();else dlg.setAttribute('open','');
+    });
+  });
+  document.querySelectorAll('.home-dialog').forEach(dlg=>{
+    const stopMedia=()=>{
+      dlg.querySelectorAll('video').forEach(v=>v.pause());
+      dlg.querySelectorAll('iframe').forEach(f=>{const s=f.src;f.src='';f.src=s;});
+    };
+    const close=()=>{if(typeof dlg.close==='function')dlg.close();else dlg.removeAttribute('open');};
+    dlg.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',close));
+    dlg.addEventListener('click',e=>{if(e.target===dlg)close();}); // click on backdrop
+    dlg.addEventListener('close',stopMedia);
+  });
+})();
