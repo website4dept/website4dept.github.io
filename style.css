@@ -876,3 +876,55 @@ footer{background:#0d2028;color:#fff}
   .person-info h3{font-size:15px}
   .profile-head-grid{grid-template-columns:110px 1fr;gap:20px}
 }
+
+
+/* =========================================================
+   Profile page v2: tabs, tables, publications
+   ========================================================= */
+.profile-quick{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:14px;font-size:14px;color:rgba(255,255,255,.85)}
+.profile-quick a{color:#f2cc82}
+.profile-resp{font-size:13.5px;color:rgba(255,255,255,.75);margin:0 0 10px}
+.profile-tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:36px;overflow-x:auto;scrollbar-width:thin;position:sticky;top:0;background:#fff;z-index:5}
+.profile-tab{padding:14px 20px;font-size:14px;font-weight:700;color:#4a5157;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s}
+.profile-tab:hover{color:var(--maroon)}
+.profile-tab.is-active{color:var(--maroon);border-bottom-color:var(--maroon)}
+.profile-panel[hidden]{display:none}
+.profile-block h3{display:flex;align-items:center;gap:10px}
+.block-count{font-family:"DM Sans",sans-serif;font-size:11px;font-weight:800;color:var(--maroon);background:#f6e9eb;padding:2px 8px}
+.profile-empty{color:var(--muted);font-style:italic;font-size:14px;margin:0}
+.profile-list li .sub{display:block;font-size:13.5px;color:var(--muted);margin-top:2px}
+.profile-side{display:flex;flex-direction:column;gap:20px;position:sticky;top:70px}
+.profile-side .surface{padding:26px}
+.profile-side .surface h3{font-family:"Libre Baskerville",serif;font-size:19px;color:var(--ink);margin-bottom:6px}
+.profile-side .pill-row{margin-top:12px;gap:6px}
+.cv-btn{display:flex;justify-content:center;margin-top:18px;width:100%}
+.profile-back{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px}
+
+.table-wrap{overflow-x:auto}
+.profile-table{width:100%;border-collapse:collapse;font-size:14px}
+.profile-table th{text-align:left;font-size:10.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:2px solid var(--line);white-space:nowrap}
+.profile-table td{padding:12px;border-bottom:1px solid #eef0f1;color:#3d4449;vertical-align:top}
+.profile-table tr:hover td{background:#fbf8f2}
+.profile-table a{color:var(--maroon);font-weight:600}
+
+.pub-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px}
+.pub-filter{border:1px solid #d7dfe2;background:#fff;padding:7px 12px;font:600 12.5px "DM Sans",sans-serif;color:#3d4449;cursor:pointer}
+.pub-filter span{color:var(--muted);font-weight:700;margin-left:3px}
+.pub-filter.is-on{background:var(--maroon);border-color:var(--maroon);color:#fff}
+.pub-filter.is-on span{color:#f2cc82}
+.pub-search{flex:1;min-width:200px;border:1px solid #d7dfe2;padding:8px 12px;font:14px "DM Sans",sans-serif}
+.pub-search:focus{outline:2px solid rgba(111,29,42,.25);border-color:var(--maroon)}
+.pub-list{list-style:none;padding:0;margin:0;counter-reset:pub}
+.pub-year{font-family:"Libre Baskerville",serif;font-size:17px;font-weight:700;color:var(--maroon);padding:18px 0 6px;border-bottom:1px solid var(--line)}
+.pub-year:first-child{padding-top:0}
+.pub-item{padding:12px 0 12px 34px;border-bottom:1px dashed #e3e6e8;position:relative;font-size:14.5px;line-height:1.65;color:#3d4449;counter-increment:pub}
+.pub-item::before{content:counter(pub) ".";position:absolute;left:0;top:12px;font-weight:700;color:var(--muted);font-size:13px}
+.pub-item[hidden],.pub-year[hidden]{display:none}
+.pub-title a{color:var(--ink);font-weight:600}
+.pub-title a:hover{color:var(--maroon)}
+.pub-doi{font-size:11px;font-weight:800;letter-spacing:.8px;color:var(--blue);border:1px solid #cfdde3;padding:1px 6px;margin-left:4px}
+
+@media(max-width:850px){
+  .profile-side{position:static;order:-1}
+  .profile-tab{padding:12px 14px;font-size:13px}
+}
