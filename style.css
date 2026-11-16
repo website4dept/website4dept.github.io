@@ -927,3 +927,21 @@ footer{background:#0d2028;color:#fff}
   .profile-side{position:static;order:-1}
   .profile-tab{padding:12px 14px;font-size:13px}
 }
+
+/* =========================================================
+   News & Events page (data-driven) 
+   ========================================================= */
+.news-list{display:flex;flex-direction:column;gap:14px;margin-top:8px}
+.news-item{display:grid;grid-template-columns:76px 1fr;gap:20px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--maroon);padding:18px 20px;scroll-margin-top:100px}
+.news-item .notice-date{width:auto}
+.news-body h3{font-family:"Libre Baskerville",serif;font-size:18px;line-height:1.4;margin:8px 0 0;color:var(--ink)}
+.news-body h3 a{color:var(--ink)}
+.news-body h3 a:hover{color:var(--maroon)}
+.news-text{margin-top:10px;color:#4a5157;font-size:15px;line-height:1.7}
+.news-text p{margin:0 0 8px}
+.badge-pin{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#3a2a10;background:#f2cc82;padding:2px 7px}
+.is-target{box-shadow:0 0 0 3px rgba(111,29,42,.2),var(--shadow)}
+#eventList .event-list,.past-events .event-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.past-events{margin-top:26px}
+.past-events summary{cursor:pointer;font-weight:700;color:var(--maroon);padding:10px 0}
+@media(max-width:850px){#eventList .event-list,.past-events .event-list{grid-template-columns:1fr}.news-item{grid-template-columns:60px 1fr;gap:14px}}

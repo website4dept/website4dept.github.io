@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Portal Login | Department of Mathematics | IIT Kharagpur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
+<link href="../style.css?v=4" rel="stylesheet">
+<link href="portal.css?v=1" rel="stylesheet">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body data-page="login" class="portal-body">
+<header class="portal-header">
+  <div class="shell portal-header-inner">
+    <a class="brand" href="../index.html" aria-label="Department of Mathematics home">
+      <div class="brand-mark"><img src="https://nptel.iitkgp.ac.in/images/logo.png" alt="IIT Kharagpur Logo" width="52" height="52"></div>
+      <div class="brand-copy"><small>Indian Institute of Technology Kharagpur</small><h1>Department of Mathematics</h1></div>
+    </a>
+    <div class="portal-header-right" id="portalHeaderRight"><a class="portal-back" href="../index.html">← Back to website</a></div>
+  </div>
+</header>
+ 
+<main class="auth-wrap" id="main">
+  <div class="auth-card">
+    <div class="eyebrow">Department portal</div>
+    <h2 class="auth-title">Log in</h2>
+    <div class="portal-alert" id="alert" hidden></div>
+
+    <form id="loginForm" class="auth-form" novalidate>
+      <label>Institute e-mail<input type="email" name="email" autocomplete="username" required placeholder="name@iitkgp.ac.in"></label>
+      <label>Password
+        <span class="pw-field"><input type="password" name="password" autocomplete="current-password" required><button type="button" class="pw-toggle" aria-label="Show password">Show</button></span>
+      </label>
+      <button class="btn btn-maroon auth-btn" type="submit">Continue →</button>
+      <p class="auth-links"><a href="forgot.html">Forgot password?</a></p>
+    </form>
+
+    <form id="otpForm" class="auth-form" hidden novalidate>
+      <p class="auth-note">We've e-mailed a 6-digit code to <strong id="otpTo"></strong>. It expires in <span id="otpMins">10</span> minutes.</p>
+      <label>Login code<input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required class="otp-input" placeholder="••••••"></label>
+      <button class="btn btn-maroon auth-btn" type="submit">Verify &amp; log in</button>
+      <p class="auth-links"><button type="button" class="link-btn" id="resendBtn">Send a new code</button> · <button type="button" class="link-btn" id="restartBtn">Use a different account</button></p>
+    </form>
+
+    <div class="auth-help">
+      <strong>Two-step login.</strong> Every login needs your password and a one-time code sent to your institute e-mail. Accounts are created by the department administrator.
+    </div>
+  </div>
+</main>
+<footer class="portal-footer"><div class="shell"><span>© 2026 Department of Mathematics, IIT Kharagpur</span><span>Department portal · authorised users only</span></div></footer>
+<script src="portal.js?v=1"></script>
+</body>
+</html>
