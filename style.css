@@ -1169,3 +1169,6 @@ h1,h2,h3,h4{font-weight:700}
 .route-link{margin-top:auto;padding-top:14px;color:var(--maroon);font-weight:700;font-size:14px;text-decoration:underline;text-underline-offset:4px}
 @media(max-width:1000px){.contact-cards{grid-template-columns:1fr 1fr}.location-grid,.route-grid{grid-template-columns:1fr}.map-large{height:360px}}
 @media(max-width:700px){.contact-cards{grid-template-columns:1fr}.contact-detail{padding:24px}.map-large{height:300px}}
+
+.contact-cards-2{grid-template-columns:1fr 1fr}
+@media(max-width:700px){.contact-cards-2{grid-template-columns:1fr}}
