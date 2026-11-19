@@ -1,5 +1,5 @@
 /* =====================================================================
-   GALLERY — photos shown on gallery.html (and in the home page slideshow)
+   PHOTOS — shown in the home page slideshow
    =====================================================================
    src     path of the image, e.g. "gallery/seminar-2026.jpg"  (put the file in the gallery folder)
    title   short caption

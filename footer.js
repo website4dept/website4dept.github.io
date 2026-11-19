@@ -38,14 +38,13 @@
       '</div>' +
       '<div class="fcol fcol-quick"><h4>Quick links</h4><div class="fquick">' + quick + '</div></div>' +
       '<div class="fcol fcol-dept"><h4>Department</h4>' +
-        '<a href="about.html">About</a><a href="people.html">People</a><a href="research.html">Research</a>' +
+        '<a href="people.html">People</a><a href="research.html">Research</a>' +
         '<a href="academics.html">Academics</a><a href="students.html">Students</a><a href="publications.html">Publications</a>' +
-        '<a href="news-events.html">News &amp; Events</a><a href="gallery.html">Gallery</a><a href="contact.html">Contact Us</a>' +
+        '<a href="news-events.html">News &amp; Events</a><a href="contact.html">Contact Us</a>' +
       '</div>' +
     '</div>' +
     '<div class="footer-bottom-wrap"><div class="content footer-bottom">' +
       '<span>© ' + new Date().getFullYear() + ' ' + esc((C.webteam && C.webteam.name) || 'Department of Mathematics, IIT Kharagpur') +
         (C.webteam && C.webteam.email ? ' · Contact web team: <a href="mailto:' + esc(C.webteam.email) + '">' + esc(C.webteam.email) + '</a>' : '') + '</span>' +
-      '<span><a href="https://www.iitkgp.ac.in/" target="_blank" rel="noopener noreferrer">IIT Kharagpur ↗</a> · <a href="portal/login.html">Portal Login</a></span>' +
     '</div></div>';
 })();

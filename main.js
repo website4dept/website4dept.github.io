@@ -2,7 +2,6 @@
 // Static website utilities. No server or credentials are used.
 const pages = [
   {name:'Home',url:'index.html',words:'homepage mathematics department IIT Kharagpur welcome'},
-  {name:'About',url:'about.html',words:'department overview history mathematics teaching collaborations'},
   {name:'Research',url:'research.html',words:'pure applied mathematics probability statistics theoretical computer science'},
   {name:'Research › Pure Mathematics',url:'research.html#pure-mathematics',words:'pure mathematics algebra analysis topology combinatorics number theory'},
   {name:'Research › Algebra',url:'research.html#algebra',words:'algebra commutative homological lie associative k-theory algebraic geometry'},

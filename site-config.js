@@ -26,7 +26,8 @@ window.DEPT_SITE = {
   webteam: { name: "WebTeam@MathsDeptIITKGP", email: "webmathsiitkgp@gmail.com" },
 
   shortcuts: [
-    { label: "ERP",                     url: "https://erp.iitkgp.ac.in" },
+    { label: "IIT Kharagpur Homepage",  url: "https://www.iitkgp.ac.in/" },
+    { label: "ERP IIT KGP",             url: "https://erp.iitkgp.ac.in" },
     { label: "Zimbra Webmail",          url: "https://iitkgpmail.iitkgp.ac.in/" },
     { label: "Gmail (students)",        url: "https://mail.google.com/" },
     { label: "Academic Calendar",       url: "https://www.iitkgp.ac.in/academic-calendar-ug" },
