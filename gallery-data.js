@@ -11,7 +11,7 @@
    photos before you upload them.
    ===================================================================== */
 window.DEPT_GALLERY = [
-  { src: "new photo.jpg", title: "IIT Kharagpur campus",              album: "Campus",     hero: true },
+  { src: "gallery/iitkgp-campus.jpg", title: "IIT Kharagpur campus",  album: "Campus",     hero: true },
   { src: "slide-2.jpg",   title: "A community of scholars",           album: "Department", hero: true },
   { src: "slide-3.jpg",   title: "Research across disciplines",       album: "Research",   hero: true }
   /* add more, one per line, for example:
