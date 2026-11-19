@@ -13,10 +13,12 @@
   if (C.office_phone) rows += '<li><span class="fk">Office</span><span><a href="' + tel(C.office_phone) + '">' + esc(C.office_phone) + '</a>' + (C.office_phone_2 ? ' · <a href="' + tel(C.office_phone_2) + '">' + esc(C.office_phone_2) + '</a>' : '') + '</span></li>';
   if (C.fax) rows += '<li><span class="fk">Fax</span><span>' + esc(C.fax) + '</span></li>';
   if (C.email) rows += '<li><span class="fk">E-mail</span><span><a href="mailto:' + esc(C.email) + '">' + esc(C.email) + '</a></span></li>';
-  if (C.webmail && C.webmail.url) rows += '<li><span class="fk">Webmail</span><span><a href="' + esc(C.webmail.url) + '"' + ext(C.webmail.url) + '>' + esc(C.webmail.label || 'Webmail') + ' ↗</a></span></li>';
 
   var S = C.social || {};
-  var icons = [['facebook', 'Facebook', 'f'], ['linkedin', 'LinkedIn', 'in'], ['x', 'X (Twitter)', 'X'], ['youtube', 'YouTube', '▶']];
+  var ytLogo = '<svg class="soc-yt" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">' +
+    '<path fill="#FF0000" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8z"/>' +
+    '<path fill="#FFFFFF" d="M9.6 15.6 15.8 12 9.6 8.4z"/></svg>';
+  var icons = [['facebook', 'Facebook', 'f'], ['linkedin', 'LinkedIn', 'in'], ['x', 'X (Twitter)', 'X'], ['youtube', 'YouTube', ytLogo]];
   var social = icons.map(function(i){
     var u = S[i[0]];
     return u ? '<a class="soc" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer" aria-label="' + i[1] + '" title="' + i[1] + '">' + i[2] + '</a>'
@@ -42,7 +44,8 @@
       '</div>' +
     '</div>' +
     '<div class="footer-bottom-wrap"><div class="content footer-bottom">' +
-      '<span>© ' + new Date().getFullYear() + ' Department of Mathematics, Indian Institute of Technology Kharagpur</span>' +
+      '<span>© ' + new Date().getFullYear() + ' ' + esc((C.webteam && C.webteam.name) || 'Department of Mathematics, IIT Kharagpur') +
+        (C.webteam && C.webteam.email ? ' · Contact web team: <a href="mailto:' + esc(C.webteam.email) + '">' + esc(C.webteam.email) + '</a>' : '') + '</span>' +
       '<span><a href="https://www.iitkgp.ac.in/" target="_blank" rel="noopener noreferrer">IIT Kharagpur ↗</a> · <a href="portal/login.html">Portal Login</a></span>' +
     '</div></div>';
 })();

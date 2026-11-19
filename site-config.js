@@ -3,7 +3,7 @@
    =====================================================================
    address        one line per entry, shown line by line in the footer
    office_phone / fax / email   shown under the address
-   webmail        the department / institute webmail link
+   webteam        copyright name + contact e-mail in the bottom strip
    shortcuts      the quick-link list (ERP, Zimbra, Gmail, calendars …)
    social         the DEPARTMENT's own pages. Leave "" until the page exists:
                   an empty entry is shown dimmed and does not link anywhere.
@@ -20,8 +20,10 @@ window.DEPT_SITE = {
   office_phone: "+91-3222-282275",
   office_phone_2: "+91-3222-282700",
   fax: "+91-3222-255303",
-  email: "hod@maths.iitkgp.ac.in",
-  webmail: { label: "Webmail (Zimbra)", url: "https://iitkgpmail.iitkgp.ac.in/" },
+  email: "office@maths.iitkgp.ac.in",
+
+  // bottom strip of the footer: copyright holder + web-team contact
+  webteam: { name: "WebTeam@MathsDept", email: "webmathsiitkgp@gmail.com" },
 
   shortcuts: [
     { label: "ERP",                     url: "https://erp.iitkgp.ac.in" },
