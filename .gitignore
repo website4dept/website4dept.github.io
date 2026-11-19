@@ -1,0 +1,23 @@
+# ---- Portal secrets: NEVER commit these ----
+# config.json = SMTP password and settings
+backend/config.json
+# data/ = accounts database, login e-mails (outbox), backups
+backend/data/
+data/
+*.db
+*.db-journal
+*.sqlite
+.env
+.env.*
+.git-credentials
+
+# Portal backup / export downloads (contain the accounts database)
+portal-backup-*.zip
+website-data-*.zip
+
+# Python / editor clutter
+__pycache__/
+*.pyc
+.vscode/
+.DS_Store
+Thumbs.db
