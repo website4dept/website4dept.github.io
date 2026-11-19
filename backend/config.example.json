@@ -18,6 +18,12 @@
   "max_failed_logins": 5,
   "lockout_minutes": 15,
   "min_password_length": 10,
+  "self_edit_types": [
+    "faculty",
+    "adjunct",
+    "postdoc",
+    "staff"
+  ],
   "secure_cookies": false,
   "mail": {
     "mode": "console",

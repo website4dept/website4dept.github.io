@@ -20,7 +20,7 @@ window.DEPT_NOTICES = [
     "kind": "notice",
     "title": "[Seminar title] — [Speaker], [Venue], [Time]",
     "tag": "Seminar",
-    "date": "",
+    "date": "2026-11-24",
     "link": "news-events.html",
     "is_new": true,
     "id": 1
@@ -29,7 +29,7 @@ window.DEPT_NOTICES = [
     "kind": "notice",
     "title": "[Admission notice title for programme]",
     "tag": "Admissions",
-    "date": "",
+    "date": "2026-11-12",
     "link": "academics.html#admissions",
     "is_new": true,
     "id": 2
@@ -38,23 +38,28 @@ window.DEPT_NOTICES = [
     "kind": "notice",
     "title": "[Course / examination schedule notice]",
     "tag": "Examination",
-    "date": "",
+    "date": "2026-11-19",
     "link": "students.html",
     "id": 3
   },
   {
-    "kind": "notice",
+    "kind": "event",
     "title": "[Workshop / conference name and details]",
     "tag": "Workshop",
-    "date": "",
+    "date": "2026-12-03",
+    "end_date": "2026-12-05",
+    "venue": "[Venue]",
     "link": "news-events.html",
     "id": 4
   },
   {
-    "kind": "notice",
-    "title": "Colloquium: [Talk title] by [Speaker]",
+    "kind": "event",
+    "title": "Colloquium: [Talk title]",
     "tag": "Colloquium",
-    "date": "",
+    "date": "2026-11-26",
+    "speaker": "[Speaker]",
+    "venue": "[Venue]",
+    "time": "[Time]",
     "link": "news-events.html",
     "id": 5
   },
@@ -62,7 +67,7 @@ window.DEPT_NOTICES = [
     "kind": "notice",
     "title": "[General departmental notice]",
     "tag": "Notice",
-    "date": "",
+    "date": "2026-11-19",
     "link": "news-events.html",
     "id": 6
   }

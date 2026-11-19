@@ -136,79 +136,115 @@ if(searchInput)searchInput.addEventListener('input',renderSearch);
 if(searchForm)searchForm.addEventListener('submit',e=>{e.preventDefault();renderSearch();const first=searchResults?.querySelector('a');if(first)first.focus();});
 
 
-// ===== Hero slideshow =====
+// ===== Hero slideshow: the Head's message first, then photos every 3 seconds =====
 (function(){
   const hero=document.getElementById('heroCarousel');
   if(!hero)return;
-  const slides=[...hero.querySelectorAll('.hero-slide')];
-  if(slides.length<2)return;
-  const dotsWrap=document.getElementById('heroDots');
-  const prevBtn=document.getElementById('heroPrev');
-  const nextBtn=document.getElementById('heroNext');
-  const pauseBtn=document.getElementById('heroPause');
-  const progress=hero.querySelector('.hero-progress');
-  const bar=progress?progress.querySelector('span'):null;
-  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let current=Math.max(0,slides.findIndex(s=>s.classList.contains('is-active')));
-  let paused=reduce;
+  const wrap=hero.querySelector('.hero-slides');
+  const templates=[...wrap.querySelectorAll('[data-photo-template]')];
+  templates.forEach(t=>t.remove());
 
-  const dots=slides.map((s,i)=>{
-    const b=document.createElement('button');
-    b.type='button';b.className='hero-dot';
-    b.setAttribute('aria-label','Go to slide '+(i+1));
-    b.addEventListener('click',()=>go(i));
-    dotsWrap.append(b);
-    return b;
+  // photos come from gallery-data.js (entries with "hero": true); missing files are skipped
+  const wanted=(window.DEPT_GALLERY||[]).filter(p=>p&&p.hero&&p.src);
+  Promise.all(wanted.map(p=>new Promise(res=>{
+    const im=new Image();im.onload=()=>res(p);im.onerror=()=>res(null);im.src=p.src;
+  }))).then(list=>{
+    list.filter(Boolean).forEach((p,i)=>{
+      if(!templates.length)return;
+      const t=templates[i%templates.length].cloneNode(true);
+      t.removeAttribute('data-photo-template');
+      const img=t.querySelector('img');img.src=p.src;img.alt=p.title||'';
+      const cap=t.querySelector('.hero-caption');if(cap&&p.title)cap.textContent=p.title;
+      wrap.append(t);
+    });
+    start();
   });
 
-  function restart(){
-    if(!bar)return;
-    progress.classList.remove('run');
-    void bar.offsetWidth; // restart the CSS animation
-    if(!paused)progress.classList.add('run');
+  function start(){
+    const slides=[...wrap.querySelectorAll('.hero-slide')];
+    const controls=hero.querySelector('.hero-controls'),progress=hero.querySelector('.hero-progress');
+    if(slides.length<2){if(controls)controls.hidden=true;if(progress)progress.hidden=true;return;}
+    const dotsWrap=document.getElementById('heroDots');
+    const prevBtn=document.getElementById('heroPrev');
+    const nextBtn=document.getElementById('heroNext');
+    const pauseBtn=document.getElementById('heroPause');
+    const bar=progress?progress.querySelector('span'):null;
+    const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let current=0;
+    let paused=reduce;
+    let videoHold=false;
+
+    slides.forEach((s,i)=>s.setAttribute('aria-label',(i+1)+' of '+slides.length));
+    const dots=slides.map((s,i)=>{
+      const b=document.createElement('button');
+      b.type='button';b.className='hero-dot';
+      b.setAttribute('aria-label','Go to slide '+(i+1));
+      b.addEventListener('click',()=>go(i));
+      dotsWrap.append(b);
+      return b;
+    });
+
+    function restart(){
+      if(!bar)return;
+      progress.classList.remove('run');
+      void bar.offsetWidth; // restart the CSS animation
+      const ms=+slides[current].dataset.duration||3000;
+      progress.style.setProperty('--hero-interval',ms+'ms');
+      if(!paused)progress.classList.add('run');
+    }
+    function go(i){
+      current=(i+slides.length)%slides.length;
+      slides.forEach((s,j)=>{
+        const on=j===current;
+        s.classList.toggle('is-active',on);s.setAttribute('aria-hidden',String(!on));
+        if(!on)s.querySelectorAll('video').forEach(v=>v.pause());
+      });
+      dots.forEach((d,j)=>{d.classList.toggle('is-active',j===current);d.setAttribute('aria-current',j===current?'true':'false');});
+      restart();
+    }
+    function setPaused(p){
+      paused=p;
+      pauseBtn.textContent=p?'▶':'❚❚';
+      pauseBtn.setAttribute('aria-label',p?'Play slideshow':'Pause slideshow');
+      restart();
+    }
+
+    if(bar)bar.addEventListener('animationend',()=>go(current+1));
+    prevBtn.addEventListener('click',()=>go(current-1));
+    nextBtn.addEventListener('click',()=>go(current+1));
+    pauseBtn.addEventListener('click',()=>{videoHold=false;setPaused(!paused);});
+
+    // while the Head's video plays, hold the slideshow; carry on when it stops
+    hero.querySelectorAll('video').forEach(v=>{
+      v.addEventListener('play',()=>{videoHold=true;setPaused(true);});
+      v.addEventListener('ended',()=>{if(videoHold){videoHold=false;setPaused(false);}});
+    });
+
+    // pause while the pointer or keyboard focus is inside the hero
+    hero.addEventListener('mouseenter',()=>hero.classList.add('is-hovered'));
+    hero.addEventListener('mouseleave',()=>hero.classList.remove('is-hovered'));
+    hero.addEventListener('focusin',()=>hero.classList.add('is-hovered'));
+    hero.addEventListener('focusout',e=>{if(!hero.contains(e.relatedTarget))hero.classList.remove('is-hovered');});
+
+    // arrow keys
+    hero.addEventListener('keydown',e=>{
+      if(e.key==='ArrowLeft')go(current-1);
+      if(e.key==='ArrowRight')go(current+1);
+    });
+
+    // swipe on touch screens
+    let startX=null;
+    hero.addEventListener('touchstart',e=>{startX=e.touches[0].clientX;},{passive:true});
+    hero.addEventListener('touchend',e=>{
+      if(startX===null)return;
+      const dx=e.changedTouches[0].clientX-startX;
+      if(Math.abs(dx)>50)go(current+(dx<0?1:-1));
+      startX=null;
+    });
+
+    setPaused(paused);
+    go(0);
   }
-  function go(i){
-    current=(i+slides.length)%slides.length;
-    slides.forEach((s,j)=>{const on=j===current;s.classList.toggle('is-active',on);s.setAttribute('aria-hidden',String(!on));});
-    dots.forEach((d,j)=>{d.classList.toggle('is-active',j===current);d.setAttribute('aria-current',j===current?'true':'false');});
-    restart();
-  }
-  function setPaused(p){
-    paused=p;
-    pauseBtn.textContent=p?'▶':'❚❚';
-    pauseBtn.setAttribute('aria-label',p?'Play slideshow':'Pause slideshow');
-    restart();
-  }
-
-  if(bar)bar.addEventListener('animationend',()=>go(current+1));
-  prevBtn.addEventListener('click',()=>go(current-1));
-  nextBtn.addEventListener('click',()=>go(current+1));
-  pauseBtn.addEventListener('click',()=>setPaused(!paused));
-
-  // pause while the pointer or keyboard focus is inside the hero
-  hero.addEventListener('mouseenter',()=>hero.classList.add('is-hovered'));
-  hero.addEventListener('mouseleave',()=>hero.classList.remove('is-hovered'));
-  hero.addEventListener('focusin',()=>hero.classList.add('is-hovered'));
-  hero.addEventListener('focusout',e=>{if(!hero.contains(e.relatedTarget))hero.classList.remove('is-hovered');});
-
-  // arrow keys
-  hero.addEventListener('keydown',e=>{
-    if(e.key==='ArrowLeft')go(current-1);
-    if(e.key==='ArrowRight')go(current+1);
-  });
-
-  // swipe on touch screens
-  let startX=null;
-  hero.addEventListener('touchstart',e=>{startX=e.touches[0].clientX;},{passive:true});
-  hero.addEventListener('touchend',e=>{
-    if(startX===null)return;
-    const dx=e.changedTouches[0].clientX-startX;
-    if(Math.abs(dx)>50)go(current+(dx<0?1:-1));
-    startX=null;
-  });
-
-  setPaused(paused);
-  go(current);
 })();
 
 // ===== HOD message: read more =====

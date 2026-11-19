@@ -17,6 +17,7 @@ What it does
 Run (development / testing)
   python3 server.py init                 # first time: creates database + config.json
   python3 server.py create-admin you@example.com
+  python3 server.py import students.json      # bulk-add scholars / alumni / mailing lists
   python3 server.py                      # http://localhost:8000
 
 Run on a real server (e.g. CIC): use any WSGI server with the `app` object, e.g.
@@ -75,6 +76,7 @@ DEFAULT_CONFIG = {
     "max_failed_logins": 5,
     "lockout_minutes": 15,
     "min_password_length": 10,
+    "self_edit_types": ["faculty", "adjunct", "postdoc", "staff"],
     "secure_cookies": False,
     "mail": {
         "mode": "console",
@@ -730,12 +732,35 @@ def require_ready_user(req):
     return u
 
 
+def can_self_edit(person):
+    return bool(person) and person.get("type") in CFG.get("self_edit_types", [])
+
+
+def check_linkable(pid):
+    p = get_person(pid)
+    if not p:
+        raise ApiError(400, "Unknown profile.")
+    if not can_self_edit(p):
+        raise ApiError(400, "Portal accounts can't be linked to {} profiles – these are managed by the admin only.".format(
+            {"scholar": "research scholar"}.get(p.get("type"), p.get("type", "this kind of"))))
+
+
+def require_user_with_editable_profile(req):
+    u = require_ready_user(req)
+    if not u["person_id"]:
+        raise ApiError(404, "Your account is not linked to a profile yet. Please contact the administrator.")
+    if not can_self_edit(get_person(u["person_id"])):
+        raise ApiError(403, "Profiles of this kind are updated by the department office. Please contact the administrator.")
+    return u
+
+
 def user_public(u):
     p = get_person(u["person_id"]) if u["person_id"] else None
     return {"id": u["id"], "email": u["email"], "name": u["name"] or (p or {}).get("name", ""),
             "role": u["role"], "person_id": u["person_id"], "must_change": bool(u["must_change"]),
             "active": bool(u["active"]), "last_login": u["last_login"], "created": u["created"],
             "has_password": bool(u["pw_hash"]),
+            "can_edit_profile": can_self_edit(p),
             "locked": bool(u["locked_until"] and parse_iso(u["locked_until"]) > now())}
 
 
@@ -921,18 +946,14 @@ def api_change_password(req):
 # ----- my profile -----
 @route("GET", "/api/me/profile")
 def api_my_profile(req):
-    u = require_ready_user(req)
-    if not u["person_id"]:
-        raise ApiError(404, "Your account is not linked to a profile yet. Please contact the administrator.")
+    u = require_user_with_editable_profile(req)
     return {"profile": get_person(u["person_id"]), "areas": get_setting("areas", {}),
             "admin_only": sorted(ADMIN_ONLY_FIELDS), "people": [{"id": p["id"], "name": p["name"], "type": p.get("type")} for p in all_people()]}
 
 
 @route("PUT", "/api/me/profile")
 def api_save_my_profile(req):
-    u = require_ready_user(req)
-    if not u["person_id"]:
-        raise ApiError(404, "No linked profile.")
+    u = require_user_with_editable_profile(req)
     current = get_person(u["person_id"])
     incoming = clean_value(req.json().get("profile") or {})
     for k, v in incoming.items():
@@ -987,16 +1008,14 @@ def store_upload(person_id, kind, data_b64, actor, ip):
 
 @route("POST", "/api/me/upload")
 def api_my_upload(req):
-    u = require_ready_user(req)
-    if not u["person_id"]:
-        raise ApiError(404, "No linked profile.")
+    u = require_user_with_editable_profile(req)
     d = req.json()
     return {"ok": True, "path": store_upload(u["person_id"], d.get("kind"), d.get("data") or "", u["email"], req.ip)}
 
 
 @route("POST", "/api/me/remove-file")
 def api_my_remove_file(req):
-    u = require_ready_user(req)
+    u = require_user_with_editable_profile(req)
     kind = req.json().get("kind")
     if kind not in FILE_FIELDS:
         raise ApiError(400, "Unknown file.")
@@ -1013,7 +1032,8 @@ def api_users(req):
     require_admin(req)
     return {"users": [user_public(u) for u in q("SELECT * FROM users ORDER BY role DESC, email")],
             "people": [{"id": p["id"], "name": p["name"], "type": p.get("type"), "status": p.get("status"), "email": p.get("email", "")} for p in all_people()],
-            "domains": CFG["allowed_email_domains"], "invite_mode": CFG["invite_mode"]}
+            "domains": CFG["allowed_email_domains"], "invite_mode": CFG["invite_mode"],
+            "self_edit_types": CFG.get("self_edit_types", [])}
 
 
 @route("POST", "/api/admin/users")
@@ -1027,8 +1047,8 @@ def api_create_user(req):
         raise ApiError(409, "An account with this e-mail already exists.")
     role = "admin" if d.get("role") == "admin" else "member"
     pid = d.get("person_id") or None
-    if pid and not get_person(pid):
-        raise ApiError(400, "Unknown profile.")
+    if pid:
+        check_linkable(pid)
     if pid and q1("SELECT 1 FROM users WHERE person_id=?", (pid,)):
         raise ApiError(409, "That profile is already linked to another account.")
     name = (d.get("name") or (get_person(pid) or {}).get("name") or "").strip()[:120]
@@ -1078,8 +1098,8 @@ def api_update_user(req, uid):
     pid = u["person_id"]
     if "person_id" in d:
         pid = d["person_id"] or None
-        if pid and not get_person(pid):
-            raise ApiError(400, "Unknown profile.")
+        if pid:
+            check_linkable(pid)
         if pid and q1("SELECT 1 FROM users WHERE person_id=? AND id<>?", (pid, u["id"])):
             raise ApiError(409, "That profile is already linked to another account.")
     name = (d.get("name", u["name"]) or "").strip()[:120]
@@ -1172,6 +1192,84 @@ def api_update_person(req, pid):
     changes = [k for k in set(cur) | set(p) if cur.get(k) != p.get(k) and k != "updated"]
     audit(admin["email"], "person.updated", pid, ", ".join(sorted(changes))[:400], req.ip)
     return {"ok": True, "profile": p}
+
+
+# ----- bulk import (JSON) -----
+PERSON_TYPES = {"faculty", "adjunct", "postdoc", "scholar", "staff"}
+PERSON_STATUSES = {"current", "former", "alumni", "sample"}
+
+
+def import_records(records, actor, ip=""):
+    """Import a list of records.
+    * a record with "list" (or "mailing_list") and "email" -> added to that mailing list
+    * any other record -> a person/profile; created, or merged into the existing one with the same id
+    Returns a report dict."""
+    if isinstance(records, dict):
+        records = records.get("people") or records.get("records") or records.get("students") or []
+    if not isinstance(records, list):
+        raise ApiError(400, "The file must contain a list of records [ {...}, {...} ].")
+    rep = {"created": [], "updated": [], "contacts": 0, "errors": []}
+    known = {p["id"] for p in all_people()}
+    for i, raw in enumerate(records[:5000], 1):
+        if not isinstance(raw, dict):
+            rep["errors"].append("Record {}: not an object".format(i))
+            continue
+        r = clean_value(raw)
+        label = "Record {} ({})".format(i, r.get("name") or r.get("email") or "no name")
+        lst = r.pop("list", None) or r.pop("mailing_list", None)
+        if lst:
+            email = norm_email(r.get("email"))
+            grp = re.sub(r"[^a-z0-9-]+", "-", str(lst).lower()).strip("-")[:40]
+            if not EMAIL_RE.match(email) or not grp:
+                rep["errors"].append(label + ": needs a valid e-mail and list name")
+                continue
+            q("INSERT OR IGNORE INTO contacts(name,email,grp) VALUES(?,?,?)", (str(r.get("name", ""))[:120], email, grp))
+            rep["contacts"] += 1
+            continue
+        if not str(r.get("name", "")).strip():
+            rep["errors"].append(label + ": 'name' is required")
+            continue
+        pid = r.get("id") or slugify(r["name"])
+        if not ID_RE.match(str(pid)):
+            rep["errors"].append(label + ": id must be lowercase letters, numbers and dashes")
+            continue
+        r["id"] = pid
+        if r.get("type") and r["type"] not in PERSON_TYPES:
+            rep["errors"].append(label + ": type must be one of " + ", ".join(sorted(PERSON_TYPES)))
+            continue
+        if r.get("status") and r["status"] not in PERSON_STATUSES:
+            rep["errors"].append(label + ": status must be current, former or alumni")
+            continue
+        if r.get("supervisor") and r["supervisor"] not in known:
+            rep["errors"].append(label + ": supervisor '{}' is not a known profile id (imported anyway, link left empty)".format(r["supervisor"]))
+            r["supervisor"] = ""
+        cur = get_person(pid)
+        if cur:
+            cur.update({k: v for k, v in r.items() if v not in (None, "", [], {})})
+            save_person(cur, actor)
+            rep["updated"].append(pid)
+        else:
+            r.setdefault("type", "scholar")
+            r.setdefault("status", "current")
+            save_person(r, actor)
+            known.add(pid)
+            rep["created"].append(pid)
+    audit(actor, "import", "", "{} created, {} updated, {} contacts, {} errors".format(
+        len(rep["created"]), len(rep["updated"]), rep["contacts"], len(rep["errors"])), ip)
+    return rep
+
+
+@route("POST", "/api/admin/import")
+def api_import(req):
+    admin = require_admin(req)
+    d = req.json()
+    data = d.get("data")
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except Exception as e:
+            raise ApiError(400, "This is not valid JSON: {}".format(e))
+    return {"ok": True, "report": import_records(data, admin["email"], req.ip)}
 
 
 @route("DELETE", r"/api/admin/people/([a-z0-9-]+)")
@@ -1514,6 +1612,17 @@ def cli():
         send_mail(to, "Test e-mail – " + CFG["site_name"], "If you can read this, e-mail sending works.",
                   html_wrap("Test e-mail", "<p>If you can read this, e-mail sending works.</p>"))
         print("Sent (mode: {}).".format(CFG["mail"]["mode"]))
+        return
+    if cmd == "import":
+        if len(args) < 2:
+            print("Usage: python server.py import file.json")
+            return
+        with open(args[1], encoding="utf-8-sig") as f:
+            data = json.load(f)
+        rep = import_records(data, "cli")
+        print("Created {}, updated {}, mailing-list contacts {}.".format(len(rep["created"]), len(rep["updated"]), rep["contacts"]))
+        for e in rep["errors"]:
+            print("  !", e)
         return
     if cmd == "export":
         out = args[1] if len(args) > 1 else CFG["site_root"]

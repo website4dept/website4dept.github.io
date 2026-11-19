@@ -241,11 +241,11 @@
     if (ME.must_change){ buildNav([]); return VIEWS.password(true); }
 
     const items = [];
-    if (ME.person_id) items.push(['My account'], ['profile', '✎', 'Edit my profile']);
+    if (ME.person_id && ME.can_edit_profile) items.push(['My account'], ['profile', '✎', 'Edit my profile']);
     else items.push(['My account']);
     items.push(['password', '🔑', 'Change password']);
     if (ME.role === 'admin'){
-      items.push(['Administration'], ['overview', '◧', 'Overview'], ['accounts', '👤', 'Accounts'], ['people', '☷', 'People & profiles'],
+      items.push(['Administration'], ['overview', '◧', 'Overview'], ['accounts', '👤', 'Accounts'], ['people', '☷', 'People & profiles'], ['import', '⇪', 'Import data (JSON)'],
                  ['notices', '📌', 'Notices & events'], ['email', '✉', 'Send e-mail'], ['lists', '☰', 'Mailing lists'],
                  ['activity', '⟲', 'Activity log'], ['export', '⬇', 'Export for website']);
     }
@@ -260,7 +260,7 @@
   }
 
   function route(){
-    const raw = location.hash.slice(1) || (ME.role === 'admin' ? 'overview' : (ME.person_id ? 'profile' : 'password'));
+    const raw = location.hash.slice(1) || (ME.role === 'admin' ? 'overview' : (ME.person_id && ME.can_edit_profile ? 'profile' : 'password'));
     const [name, arg] = raw.split('/');
     if (dirty && !confirm('You have unsaved changes. Leave without saving?')){
       history.replaceState(null, '', '#' + (route.last || ''));
@@ -620,14 +620,15 @@
     const personName = id => (d.people.find(p => p.id === id) || {}).name || id;
     freshView();
     const statusOf = u => !u.active ? ['disabled', 'Disabled'] : u.locked ? ['locked', 'Locked'] : !u.has_password ? ['pending', 'Invited'] : u.must_change ? ['pending', 'Temp. password'] : ['active', 'Active'];
-    const peopleOpts = '<option value="">— not linked —</option>' + d.people.filter(p => p.status !== 'sample').map(p =>
+    const canLink = p => (d.self_edit_types || []).includes(p.type);
+    const peopleOpts = '<option value="">— not linked —</option>' + d.people.filter(p => p.status !== 'sample' && canLink(p)).map(p =>
       '<option value="' + esc(p.id) + '"' + (linkedIds.has(p.id) ? ' disabled' : '') + '>' + esc(p.name) + ' (' + esc(p.type) + ')' + (linkedIds.has(p.id) ? ' – has account' : '') + '</option>').join('');
 
     $('#view').innerHTML = head('Accounts', 'Only official e-mail addresses (' + d.domains.map(x => '@' + esc(x)).join(', ') + ') can have accounts. ' +
         'New accounts receive an e-mail to ' + (d.invite_mode === 'password' ? 'log in with a temporary password' : 'set their own password') + '.') +
       '<div class="card"><h3>Create an account</h3><form class="pform" id="newUser" novalidate><div class="pgrid">' +
         '<label>Official e-mail<input type="email" name="email" required placeholder="name@' + esc(d.domains[0] || 'iitkgp.ac.in') + '"></label>' +
-        '<label>Link to profile<select name="person_id">' + peopleOpts + '</select></label>' +
+        '<label>Link to profile <span class="field-note">(research scholars can’t have accounts – the admin edits their profiles)</span><select name="person_id">' + peopleOpts + '</select></label>' +
         '<label>Display name <span class="field-note">(optional – taken from the profile)</span><input name="name"></label>' +
         '<label>Role<select name="role"><option value="member">Member – edits own profile</option><option value="admin">Admin – full access</option></select></label>' +
         '<label class="check full"><input type="checkbox" name="send_invite" checked> Send the invitation e-mail now</label>' +
@@ -903,6 +904,48 @@
         if (c){ await api('DELETE', '/admin/contacts/' + c.dataset.cdel); c.closest('tr').remove(); toast('Removed.'); }
         if (l && confirm('Delete the whole list “' + l.dataset.ldel + '”?')){ await api('DELETE', '/admin/lists/' + encodeURIComponent(l.dataset.ldel)); VIEWS.lists(); toast('List deleted.'); }
       } catch (err) { toast(err.message, true); }
+    });
+  };
+
+  /* ---------------- admin: import ---------------- */
+  VIEWS.import = function(){
+    $('#view').innerHTML = head('Import data (JSON)', 'Add many research scholars, postdocs, alumni or mailing-list contacts at once from a JSON file.') +
+      '<div class="card"><h3>1. Choose the file</h3><form class="pform" id="impForm" novalidate>' +
+        '<label class="btn btn-light btn-sm" style="align-self:flex-start">Choose .json file<input type="file" accept=".json,application/json" id="impFile" hidden></label>' +
+        '<label>…or paste the JSON here<textarea name="json" rows="10" placeholder="[ {&quot;name&quot;: &quot;…&quot;, &quot;type&quot;: &quot;scholar&quot;, … } ]"></textarea></label>' +
+        '<div class="view-actions"><button class="btn btn-maroon" type="submit">Import</button></div></form></div>' +
+      '<div id="impReport"></div>' +
+      '<div class="card"><h3>How records are treated</h3><p class="hint">' +
+      '• A record with <code>"list"</code> and <code>"email"</code> is added to that <a href="#lists">mailing list</a> (e.g. current M.Sc. students).<br>' +
+      '• Any other record is a <b>profile</b>. If a profile with the same <code>id</code> already exists, the fields in the file are added to it; otherwise a new profile is created. ' +
+      'The id is made from the name if you leave it out.<br>' +
+      '• Research scholars: <code>"type": "scholar"</code>, postdocs: <code>"postdoc"</code>. Graduated ones: <code>"status": "alumni"</code> with <code>"year"</code> = year completed – they appear under Alumni.<br>' +
+      '• <code>"supervisor"</code> must be the supervisor’s profile id (e.g. <code>ratna-dutta</code>) – it links the scholar to that professor’s Students tab.<br>' +
+      '• Importing the same file twice does not create duplicates.<br>• Research scholars don’t get portal logins; update their profiles here or under People &amp; profiles.</p></div>';
+    const form = $('#impForm');
+    $('#impFile').addEventListener('change', async e => {
+      const f = e.target.files[0]; if (!f) return;
+      form.elements.json.value = await f.text();
+      toast('File loaded – check it, then press Import.');
+    });
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const text = form.elements.json.value.trim();
+      if (!text){ alertBox('Choose a file or paste the JSON first.'); return; }
+      let data;
+      try { data = JSON.parse(text); } catch (err) { alertBox('This is not valid JSON: ' + esc(err.message) + '. Check for missing commas or quotes.'); return; }
+      const n = Array.isArray(data) ? data.length : '';
+      if (!confirm('Import ' + n + ' record(s)?')) return;
+      const btn = form.querySelector('button'); busy(btn, true, 'Importing…');
+      try {
+        const r = (await api('POST', '/admin/import', {data})).report;
+        $('#impReport').innerHTML = '<div class="card"><h3>Result</h3><p class="hint"><b>' + r.created.length + '</b> profiles created, <b>' + r.updated.length +
+          '</b> updated, <b>' + r.contacts + '</b> mailing-list contacts added.</p>' +
+          (r.errors.length ? '<p class="hint" style="color:#a3261e">' + r.errors.map(esc).join('<br>') + '</p>' : '') +
+          (r.created.length ? '<p class="hint">New: ' + r.created.map(id => '<a href="#person/' + esc(id) + '">' + esc(id) + '</a>').join(', ') + '</p>' : '') + '</div>';
+        toast('Import finished.');
+      } catch (err) { alertBox(esc(err.message)); }
+      busy(btn, false);
     });
   };
 

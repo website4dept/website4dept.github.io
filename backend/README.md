@@ -2,7 +2,7 @@
 
 The portal adds logins to the website:
 
-* **Faculty, postdocs, scholars and staff** log in and edit their own profile (bio, publications, projects, students, teaching, photo, CV …).
+* **Faculty, postdocs and staff** log in and edit their own profile (research scholars have no logins – the admin keeps their profiles; change `self_edit_types` in `config.json` to adjust) (bio, publications, projects, students, teaching, photo, CV …).
 * **Two-step login every time:** institute e-mail + password, then a 6-digit code sent to that e-mail.
 * **Accounts are created only by the admin**, only for allowed e-mail domains. The person receives an invitation e-mail to set their password (or a temporary password – see `invite_mode`).
 * **Admin panel:** accounts, every profile (designation, status → Former Faculty / Alumni), notices & events (home Notice Board + News & Events page), mailing lists, e-mail to groups, activity log, export.
@@ -75,6 +75,15 @@ Gmail allows roughly 500 e-mails a day – fine for testing and small groups.
 | E-mail all faculty / scholars / students | Admin → **Send e-mail**. Students: first make a list in **Mailing lists** (paste "Name, e-mail" lines from Excel). |
 | See who changed what | Admin → **Activity log**. |
 
+### Adding many scholars, alumni or students at once (JSON)
+Templates: `docs/import-template-scholars.json` and `docs/import-template-students.json`.
+Admin → **Import data (JSON)** → choose the file → Import (or `python server.py import file.json`).
+* Profiles (`"type": "scholar"` / `"postdoc"` / …) are created, or merged into the existing profile with the same `id`.
+* Graduated scholars: `"status": "alumni"` + `"year"` (completed) + optional `"now"` → listed under Alumni.
+* `"supervisor"` = the professor's profile id → the scholar appears on that professor's Students tab.
+* Records with `"list"` + `"email"` go to that mailing list (current students, alumni contacts).
+* Importing the same file again updates, never duplicates.
+
 ### While the public website is still on GitHub Pages
 GitHub cannot run this server, so the GitHub copy shows the data files as they were last uploaded.
 To publish portal changes there: Admin → **Export for website** → download → upload the files inside to GitHub.
@@ -129,5 +138,6 @@ python server.py                  start the server
 python server.py init             create database / config (safe to repeat)
 python server.py create-admin E [profile-id]   create or promote an admin and e-mail an invitation
 python server.py test-mail E      send a test e-mail
+python server.py import file.json bulk-add scholars, postdocs, alumni or mailing-list contacts
 python server.py export [folder]  write people-data.js and notices-data.js
 ```

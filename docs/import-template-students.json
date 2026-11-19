@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Student Name",
+    "email": "student1@kgpian.iitkgp.ac.in",
+    "list": "msc-2025"
+  },
+  {
+    "name": "Student Name",
+    "email": "student2@kgpian.iitkgp.ac.in",
+    "list": "bsms-2023"
+  },
+  {
+    "name": "Alumnus Name",
+    "email": "alumnus@example.com",
+    "list": "alumni-msc-2020"
+  }
+]

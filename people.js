@@ -57,6 +57,8 @@
     if (p.head && p.status === 'current') meta += '<span class="person-role">Head of the Department</span>';
     if (t) meta += '<span class="person-title">' + esc(t) + '</span>';
     if (sup) meta += '<span class="person-meta">Supervisor: <a href="' + profileUrl(sup) + '">' + esc(sup.name) + '</a></span>';
+    if (p.cosupervisor) meta += '<span class="person-meta">Co-supervisor: ' + esc(p.cosupervisor) + '</span>';
+    if (p.topic && (p.type === 'scholar' || p.type === 'postdoc')) meta += '<span class="person-meta person-topic">' + esc(p.topic) + '</span>';
     if (p.status === 'alumni' && p.year) meta += '<span class="person-meta">Completed ' + esc(p.year) + '</span>';
     if (p.now) meta += '<span class="person-meta">Now: ' + esc(p.now) + '</span>';
     const pills = areaPills(p, 3);
@@ -247,6 +249,8 @@
     if (p.profile) rows.push('<li><span>Institute</span>' + link(p.profile, 'IIT KGP profile ↗') + '</li>');
     const sup = p.supervisor && findPerson(p.supervisor);
     if (sup) rows.push('<li><span>' + (p.type === 'postdoc' ? 'Mentor' : 'Supervisor') + '</span><a href="' + profileUrl(sup) + '">' + esc(sup.name) + '</a></li>');
+    if (p.cosupervisor) rows.push('<li><span>Co-supervisor</span>' + esc(p.cosupervisor) + '</li>');
+    if (p.topic && !(p.areas || []).length) rows.push('<li><span>Research topic</span>' + esc(p.topic) + '</li>');
     if (p.year && p.status === 'current') rows.push('<li><span>Joined</span>' + esc(p.year) + '</li>');
     const side =
       '<aside class="profile-side">' +

@@ -1,0 +1,68 @@
+[
+  {
+    "name": "Firstname Lastname",
+    "type": "scholar",
+    "designation": "Ph.D. Scholar",
+    "status": "current",
+    "supervisor": "ratna-dutta",
+    "year": "2023",
+    "email": "name@kgpian.iitkgp.ac.in",
+    "areas": [
+      "cryptography"
+    ],
+    "interests": "Post-quantum cryptography",
+    "bio": "",
+    "education": [
+      {
+        "degree": "M.Sc.",
+        "subject": "Mathematics",
+        "institution": "…",
+        "year": "2022"
+      }
+    ],
+    "publications": [
+      {
+        "type": "journal",
+        "authors": "F. Lastname, R. Dutta",
+        "title": "…",
+        "venue": "…",
+        "year": "2025",
+        "doi": ""
+      }
+    ]
+  },
+  {
+    "name": "Another Scholar",
+    "type": "scholar",
+    "designation": "Ph.D. Scholar",
+    "status": "alumni",
+    "supervisor": "somesh-kumar",
+    "year": "2024",
+    "now": "Assistant Professor, XYZ University",
+    "email": "",
+    "areas": [
+      "statistical-inference"
+    ],
+    "education": [
+      {
+        "degree": "Ph.D.",
+        "subject": "Mathematics",
+        "institution": "IIT Kharagpur",
+        "year": "2024",
+        "thesis": "Thesis title"
+      }
+    ]
+  },
+  {
+    "name": "Postdoc Name",
+    "type": "postdoc",
+    "designation": "NBHM Postdoctoral Fellow",
+    "status": "current",
+    "supervisor": "mithun-bhowmik",
+    "year": "2025",
+    "email": "",
+    "areas": [
+      "analysis"
+    ]
+  }
+]
