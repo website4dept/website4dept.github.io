@@ -1,0 +1,41 @@
+{
+  "site_name": "Department of Mathematics, IIT Kharagpur",
+  "base_url": "https://maths.iitkgp.ac.in",
+  "host": "127.0.0.1",
+  "port": 8000,
+  "site_root": "..",
+  "data_dir": "data",
+  "allowed_email_domains": [
+    "iitkgp.ac.in"
+  ],
+  "invite_mode": "link",
+  "invite_hours": 48,
+  "reset_minutes": 60,
+  "otp_minutes": 10,
+  "otp_max_attempts": 5,
+  "session_hours": 8,
+  "max_failed_logins": 5,
+  "lockout_minutes": 15,
+  "min_password_length": 10,
+  "self_edit_types": [
+    "faculty",
+    "adjunct",
+    "postdoc",
+    "staff"
+  ],
+  "secure_cookies": true,
+  "admin_ip_allowlist": [],
+  "mail": {
+    "mode": "smtp",
+    "from_name": "Department of Mathematics, IIT Kharagpur",
+    "from_email": "no-reply@maths.iitkgp.ac.in",
+    "reply_to": "office@maths.iitkgp.ac.in",
+    "smtp_host": "CIC-MAIL-SERVER-HOST",
+    "smtp_port": 587,
+    "smtp_security": "starttls",
+    "smtp_user": "CIC-SMTP-USER",
+    "smtp_password": "",
+    "bulk_delay_seconds": 0.5
+  },
+  "trust_proxy": true
+}

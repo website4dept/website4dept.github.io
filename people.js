@@ -114,8 +114,91 @@
       el.innerHTML = html || '<div class="empty-state"><h3>List to be added</h3><p>' + esc(el.dataset.empty || '') + '</p></div>';
     });
 
-    // re-apply #hash scrolling now that the cards exist (e.g. people.html#ratna-dutta)
-    if (location.hash){
+    // People page: overview (intro, search, category cards) -> one section at a time
+    const SECS = [['faculty', 'Faculty', 'Professors, associate and assistant professors of the Department.'],
+                  ['adjunct-faculty', 'Adjunct & INSPIRE', 'Adjunct and DST-INSPIRE faculty.'],
+                  ['postdoctoral-fellows', 'Postdoctoral Fellows', 'Postdoctoral researchers working with our faculty.'],
+                  ['research-scholars', 'Research Scholars', 'Current Ph.D. scholars, listed with their supervisors.'],
+                  ['staff', 'Staff', 'Administrative and technical staff of the Department.'],
+                  ['former-faculty', 'Former Faculty', 'Faculty who have retired or moved on.'],
+                  ['alumni', 'Alumni', 'Ph.D. and postdoctoral alumni.']];
+    const catOf = p => {
+      if (p.status === 'former' && ['faculty', 'adjunct', 'staff'].includes(p.type)) return 'former-faculty';
+      if (p.status === 'alumni' && ['scholar', 'postdoc'].includes(p.type)) return 'alumni';
+      if (p.status !== 'current') return '';
+      return {faculty: 'faculty', adjunct: 'adjunct-faculty', postdoc: 'postdoctoral-fellows', scholar: 'research-scholars', staff: 'staff'}[p.type] || '';
+    };
+    const counts = {};
+    PEOPLE.forEach(p => { const c = catOf(p); if (c) counts[c] = (counts[c] || 0) + 1; });
+    const label = id => (SECS.find(s => s[0] === id) || [])[1] || '';
+    const secEls = SECS.map(s => document.getElementById(s[0])).filter(Boolean);
+    const hero = document.querySelector('main > .page-hero');
+    if (secEls.length && hero){
+      const bar = document.createElement('div');
+      bar.className = 'content people-tabs-wrap';
+      bar.innerHTML = '<div class="pill-row people-tabs" role="tablist" aria-label="People sections">' +
+        '<a class="pill" href="#overview" data-sec="overview">‹ Overview</a>' +
+        SECS.map(s => '<a class="pill" role="tab" href="#' + s[0] + '" data-sec="' + s[0] + '">' + esc(s[1]) + ' <span class="pill-count">' + (counts[s[0]] || 0) + '</span></a>').join('') + '</div>';
+      const ov = document.createElement('section');
+      ov.className = 'page-section people-overview'; ov.id = 'overview';
+      ov.innerHTML = '<div class="content">' +
+        '<p class="people-intro">Founded in 1951 by Prof. B. R. Seth, its first Head, the Department of Mathematics has grown with IIT Kharagpur, India’s first IIT. ' +
+        'Our faculty, scholars and staff work across pure mathematics, applied mathematics, probability &amp; statistics and theoretical computer science.</p>' +
+        '<form class="people-search" role="search" onsubmit="return false"><label for="peopleSearch">Find a person</label>' +
+        '<input id="peopleSearch" type="search" placeholder="Search by name, supervisor or research area…" autocomplete="off"></form>' +
+        '<div class="people-results" id="peopleResults" aria-live="polite" hidden></div>' +
+        '<div class="people-cards" id="peopleCards">' +
+        SECS.map(s => '<a class="info-card people-card" href="#' + s[0] + '"><span class="people-count">' + (counts[s[0]] || 0) + '</span><h3>' + esc(s[1]) + '</h3><p>' + esc(s[2]) + '</p><span class="card-link">View →</span></a>').join('') +
+        '</div></div>';
+      hero.insertAdjacentElement('afterend', ov);
+      ov.insertAdjacentElement('beforebegin', bar);
+
+      const supName = p => { const s = p.supervisor && findPerson(p.supervisor); return s ? s.name : ''; };
+      const hay = p => [p.name, p.designation, p.topic, supName(p), p.cosupervisor, p.roll, p.now, (p.areas || []).map(a => AREAS[a]).join(' ')].join(' ').toLowerCase();
+      const box = ov.querySelector('#peopleSearch'), res = ov.querySelector('#peopleResults'), cards = ov.querySelector('#peopleCards');
+      box.addEventListener('input', () => {
+        const toks = box.value.toLowerCase().split(/\s+/).filter(Boolean);
+        if (!toks.length){ res.hidden = true; cards.hidden = false; return; }
+        const hits = PEOPLE.filter(p => catOf(p) && toks.every(t => hay(p).includes(t)))
+          .sort((a, b) => SECS.findIndex(s => s[0] === catOf(a)) - SECS.findIndex(s => s[0] === catOf(b)) || String(a.name).localeCompare(String(b.name)));
+        cards.hidden = true; res.hidden = false;
+        res.innerHTML = hits.length
+          ? '<p class="hint">' + hits.length + ' result' + (hits.length > 1 ? 's' : '') + (hits.length > 60 ? ' (showing the first 60)' : '') + '</p><ul class="people-hit-list">' +
+            hits.slice(0, 60).map(p => '<li><a class="hit-name" href="' + profileUrl(p) + '">' + esc(p.name) + '</a><a class="hit-cat" href="#' + catOf(p) + '">' + esc(label(catOf(p))) + '</a>' +
+              '<span class="hit-sub">' + esc(supName(p) ? 'Supervisor: ' + supName(p) : (p.topic || '')) + '</span></li>').join('') + '</ul>'
+          : '<div class="empty-state"><h3>No match</h3><p>Try part of a name, a supervisor’s name or a research area.</p></div>';
+      });
+
+      const idOf = hash => {
+        const id = decodeURIComponent(hash.replace(/^#/, ''));
+        if (!id || id === 'overview') return 'overview';
+        if (SECS.some(s => s[0] === id)) return id;
+        const el = document.getElementById(id);                  // e.g. #ratna-dutta -> the section holding that card
+        const sec = el && el.closest('section.page-section');
+        return sec && SECS.some(s => s[0] === sec.id) ? sec.id : 'overview';
+      };
+      const show = hash => {
+        const cur = idOf(hash), isOv = cur === 'overview';
+        secEls.forEach(el => { el.hidden = el.id !== cur; });
+        ov.hidden = !isOv; bar.hidden = isOv;
+        bar.querySelectorAll('.pill').forEach(a => {
+          const on = a.dataset.sec === cur;
+          a.classList.toggle('is-current', on); a.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        return cur;
+      };
+      document.addEventListener('click', e => {
+        const a = e.target.closest('a[href^="#"]'); if (!a || !(bar.contains(a) || ov.contains(a))) return;
+        const id = a.getAttribute('href').slice(1); if (id !== 'overview' && !SECS.some(s => s[0] === id)) return;
+        e.preventDefault(); history.pushState(null, '', '#' + id); show('#' + id);
+        window.scrollTo({top: Math.max(0, (hero.offsetTop + hero.offsetHeight) - 70), behavior: 'smooth'});
+      });
+      window.addEventListener('hashchange', () => { show(location.hash); window.scrollTo({top: Math.max(0, (hero.offsetTop + hero.offsetHeight) - 70), behavior: 'smooth'}); });
+      window.addEventListener('popstate', () => show(location.hash));
+      const first = show(location.hash);
+      const t = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (t && t.id !== first && t.id !== 'overview') setTimeout(() => t.scrollIntoView({block: 'start'}), 50);
+    } else if (location.hash){
       const t = document.getElementById(decodeURIComponent(location.hash.slice(1)));
       if (t) setTimeout(() => t.scrollIntoView({block: 'start'}), 50);
     }

@@ -1,0 +1,25 @@
+# systemd unit – keeps the portal + website running and restarts it after a reboot or crash.
+# Install:  sudo cp portal.service /etc/systemd/system/mathsite.service
+#           sudo systemctl daemon-reload && sudo systemctl enable --now mathsite
+# Adjust User/Group and the two /srv/mathsite paths if the site lives elsewhere.
+[Unit]
+Description=Department of Mathematics website and portal
+After=network.target
+
+[Service]
+User=mathsite
+Group=mathsite
+WorkingDirectory=/srv/mathsite/backend
+ExecStart=/usr/bin/python3 /srv/mathsite/backend/server.py
+# Optional: keep the SMTP password out of config.json
+# Environment=PORTAL_SMTP_PASSWORD=change-me
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/srv/mathsite
+
+[Install]
+WantedBy=multi-user.target

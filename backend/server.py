@@ -78,6 +78,7 @@ DEFAULT_CONFIG = {
     "min_password_length": 10,
     "self_edit_types": ["faculty", "adjunct", "postdoc", "staff"],
     "secure_cookies": False,
+    "trust_proxy": False,
     "admin_ip_allowlist": [],
     "mail": {
         "mode": "console",
@@ -676,7 +677,9 @@ class Request:
         self.method = environ["REQUEST_METHOD"].upper()
         self.path = unquote(environ.get("PATH_INFO", "/")) or "/"
         self.query = {k: v[0] for k, v in parse_qs(environ.get("QUERY_STRING", "")).items()}
-        fwd = environ.get("HTTP_X_FORWARDED_FOR", "")
+        # behind CIC's web server (nginx/Apache) set "trust_proxy": true so the real visitor address is used;
+        # otherwise a visitor could fake X-Forwarded-For to dodge the login rate limit / IP allow-list.
+        fwd = environ.get("HTTP_X_FORWARDED_FOR", "") if CFG.get("trust_proxy") else ""
         self.ip = (fwd.split(",")[0].strip() if fwd else environ.get("REMOTE_ADDR", ""))
         self._json = None
         self.user = None
@@ -1854,7 +1857,7 @@ def api_force_logout(req, uid):
 # ---------------------------------------------------------------------------
 # Static files & WSGI app
 # ---------------------------------------------------------------------------
-BLOCKED = re.compile(r"(^|/)(backend|data|\.git|\.github)(/|$)|(^|/)\.")
+BLOCKED = re.compile(r"(^|/)(backend|data|deploy|\.git|\.github)(/|$)|(^|/)\.")
 
 
 def serve_static(req):
@@ -1928,7 +1931,8 @@ def app(environ, start_response):
 
 
 def respond(start_response, status, ctype, body, headers):
-    hdrs = [("Content-Type", ctype), ("Content-Length", str(len(body)))] + SECURITY_HEADERS + headers
+    hsts = [("Strict-Transport-Security", "max-age=31536000")] if CFG.get("secure_cookies") else []
+    hdrs = [("Content-Type", ctype), ("Content-Length", str(len(body)))] + SECURITY_HEADERS + hsts + headers
     start_response(STATUS_TEXT.get(status, str(status)), hdrs)
     return [body]
 
@@ -1946,6 +1950,54 @@ class QuietHandler(WSGIRequestHandler):
 # ---------------------------------------------------------------------------
 # Command line
 # ---------------------------------------------------------------------------
+def preflight_check():
+    """Checks config.json for a live deployment. Prints OK / WARN / FAIL lines; returns False if anything FAILs."""
+    bad = [0]
+
+    def line(level, msg):
+        print("  [{}] {}".format(level, msg))
+        if level == "FAIL":
+            bad[0] += 1
+    print("Pre-flight check for", CFG["base_url"])
+    line("OK" if sys.version_info >= (3, 9) else "FAIL", "Python {}.{}".format(*sys.version_info[:2]) + ("" if sys.version_info >= (3, 9) else " – need 3.9 or newer"))
+    https = CFG["base_url"].startswith("https://")
+    line("OK" if https else "WARN", "base_url is " + ("https" if https else "not https – set the real https:// address of the site"))
+    line("OK" if CFG["secure_cookies"] else "WARN", "secure_cookies " + ("on" if CFG["secure_cookies"] else "is off – set true once the site runs on https"))
+    line("OK" if CFG.get("trust_proxy") else "WARN", "trust_proxy " + ("on (real visitor address is read from the web server)" if CFG.get("trust_proxy") else "is off – set true when nginx/Apache sits in front"))
+    m = CFG["mail"]
+    if m["mode"] == "smtp":
+        ok = (m.get("smtp_host") and m.get("from_email") and "example.com" not in m["from_email"]
+              and "CIC-" not in str(m.get("smtp_host")) and "CIC-" not in str(m.get("smtp_user")))
+        line("OK" if ok else "FAIL", "mail: smtp via {}:{} from {}".format(m.get("smtp_host"), m.get("smtp_port"), m.get("from_email")))
+        if m.get("smtp_user") and not m.get("smtp_password"):
+            line("WARN", "smtp_password is empty (or set the PORTAL_SMTP_PASSWORD environment variable)")
+    else:
+        line("FAIL", "mail mode is '{}' – real login codes are NOT sent. Set \"mode\": \"smtp\" with the CIC mail server".format(m["mode"]))
+    extra = [d for d in CFG["allowed_email_domains"] if d != "iitkgp.ac.in" and not d.endswith(".iitkgp.ac.in")]
+    line("OK" if not extra else "WARN", "allowed e-mail domains: " + ", ".join(CFG["allowed_email_domains"]) + ("" if not extra else "  (remove test domains)"))
+    line("OK" if CFG["host"] in ("127.0.0.1", "localhost") or not CFG.get("trust_proxy") else "WARN",
+         "listening on {}:{}".format(CFG["host"], CFG["port"]) + ("  (use 127.0.0.1 when behind nginx/Apache)" if CFG["host"] not in ("127.0.0.1", "localhost") else ""))
+    try:
+        os.makedirs(CFG["data_dir"], exist_ok=True)
+        t = os.path.join(CFG["data_dir"], ".w")
+        open(t, "w").write("x"); os.remove(t)
+        line("OK", "data folder is writable: " + CFG["data_dir"])
+    except OSError as e:
+        line("FAIL", "cannot write to the data folder: {}".format(e))
+    try:
+        os.makedirs(UPLOADS, exist_ok=True)
+        line("OK", "uploads folder: " + UPLOADS)
+    except OSError as e:
+        line("FAIL", "cannot create the uploads folder: {}".format(e))
+    admins = q1("SELECT COUNT(*) c FROM users WHERE role='admin' AND active=1")["c"]
+    line("OK" if admins else "FAIL", "{} active admin account(s)".format(admins) + ("" if admins else " – run: python3 server.py setup admin@iitkgp.ac.in"))
+    if os.name == "posix" and os.path.exists(CONFIG_PATH):
+        mode = os.stat(CONFIG_PATH).st_mode & 0o077
+        line("OK" if not mode else "WARN", "config.json is " + ("private" if not mode else "readable by other users – run: chmod 600 config.json"))
+    print("Result:", "READY" if not bad[0] else "{} problem(s) to fix".format(bad[0]))
+    return not bad[0]
+
+
 def cli():
     for stream in (sys.stdout, sys.stderr):
         try:
@@ -1958,6 +2010,18 @@ def cli():
     if cmd == "init":
         print("Database ready:", DB_PATH)
         return
+    if cmd == "check":
+        sys.exit(0 if preflight_check() else 1)
+    if cmd == "setup":                      # one command for a fresh server: database + first admin + checks
+        if len(args) < 2:
+            print("Usage: python3 server.py setup admin@iitkgp.ac.in [profile-id]")
+            return
+        print("Database ready:", DB_PATH)
+        cmd = "create-admin"
+        args = ["create-admin"] + args[1:]
+        setup_mode = True
+    else:
+        setup_mode = False
     if cmd == "create-admin":
         if len(args) < 2:
             print("Usage: python3 server.py create-admin email@domain [person-id]")
@@ -1980,8 +2044,15 @@ def cli():
             u = q1("SELECT * FROM users WHERE email=?", (email,))
             print("Admin account created for", email)
         audit("cli", "admin.created", email)
-        send_invite(u, "cli")
-        print("Invitation e-mail sent (mail mode: {}).".format(CFG["mail"]["mode"]))
+        try:
+            send_invite(u, "cli")
+            print("Invitation e-mail sent (mail mode: {}).".format(CFG["mail"]["mode"]))
+        except Exception as e:
+            print("Admin account is ready, but the invitation e-mail could not be sent: {}".format(e))
+            print("Fix the mail settings in config.json, then run:  python3 server.py create-admin {}  (sends it again)".format(email))
+        if setup_mode:
+            print()
+            preflight_check()
         return
     if cmd == "test-mail":
         to = args[1] if len(args) > 1 else ""

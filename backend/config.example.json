@@ -37,5 +37,6 @@
     "smtp_user": "your.dummy.account@gmail.com",
     "smtp_password": "",
     "bulk_delay_seconds": 0.5
-  }
+  },
+  "trust_proxy": false
 }

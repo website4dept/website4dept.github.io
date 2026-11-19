@@ -81,8 +81,8 @@
   async function serverCheck(){
     try { await api('GET', '/status'); return true; }
     catch (e) {
-      alertBox('<strong>The login system is not available here.</strong> This copy of the website (for example on GitHub Pages) has no portal server. ' +
-               'Run <code>backend/server.py</code> (see backend/README.md), or use the department\'s portal address.', 'info');
+      alertBox('<strong>The staff portal is not active on this demo website yet.</strong> It will be switched on when the website moves to the department server. ' +
+               'Until then, notices and people details are updated directly in the site files.', 'info');
       $$('form').forEach(f => f.hidden = true);
       return false;
     }
