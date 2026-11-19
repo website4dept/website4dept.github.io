@@ -31,7 +31,7 @@
 
   /* ---------- data ---------- */
   var RAW = Array.isArray(window.DEPT_NOTICES) ? window.DEPT_NOTICES : [];
-  var items = RAW.filter(function(n){ return n && n.title && !n.draft && !(n.expires && n.expires < todayISO); })
+  var items = RAW.filter(function(n){ return n && n.title && !n.draft && !(n.expires && n.expires < todayISO) && !(n.publish_on && n.publish_on > todayISO); })
                  .map(function(n){ var c = {}; for (var k in n) c[k] = n[k]; c.kind = n.kind === 'event' ? 'event' : 'notice'; return c; });
 
   // newest first, pinned on top, undated last
@@ -75,7 +75,7 @@
         '<span class="notice-tag ' + tagClass(n.tag) + '">' + esc(n.tag || (n.kind === 'event' ? 'Event' : 'Notice')) + '</span>' +
         (n.kind === 'event' ? '<span class="nb-kind">Event' + esc(range) + '</span>' : '') +
         (n.pinned ? '<span class="nb-kind">Pinned</span>' : '') +
-        (n.is_new ? '<span class="badge-new">New</span>' : '') +
+        (n.urgent ? '<span class="badge-new" style="background:#b00020">Urgent</span>' : (n.is_new ? '<span class="badge-new">New</span>' : '')) +
       '</div><a href="' + esc(href) + '"' + extAttr(href) + '>' + esc(title) + '</a>' +
       (sub ? '<div class="nb-sub">' + esc(sub) + '</div>' : '') +
       (n.body && selected ? '<div class="nb-sub nb-text">' + esc(n.body.length > 160 ? n.body.slice(0, 157) + '…' : n.body) + '</div>' : '') +

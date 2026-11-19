@@ -214,6 +214,7 @@
   /* ------------------------------------------------------------------ */
   /* DASHBOARD                                                           */
   /* ------------------------------------------------------------------ */
+  const ROLE_LABEL = {admin: 'Admin', member: 'Member', notices: 'Content editor', people: 'People editor'};
   const VIEWS = {};
   let dirty = false;
   window.addEventListener('beforeunload', e => { if (dirty){ e.preventDefault(); e.returnValue = ''; } });
@@ -228,7 +229,7 @@
     }
     $('#portalHeaderRight').innerHTML =
       '<span class="portal-user"><span>Signed in as <strong>' + esc(ME.name || ME.email) + '</strong></span>' +
-      '<span class="role-chip' + (ME.role === 'admin' ? ' admin' : '') + '">' + (ME.role === 'admin' ? 'Admin' : 'Member') + '</span></span>' +
+      '<span class="role-chip' + (ME.role === 'admin' ? ' admin' : '') + '">' + (ROLE_LABEL[ME.role] || 'Member') + '</span></span>' +
       '<a class="portal-back" href="../index.html" target="_blank" rel="noopener">View website ↗</a>' +
       '<button type="button" class="btn btn-light btn-sm" id="logoutBtn">Log out</button>';
     $('#logoutBtn').addEventListener('click', async () => {
@@ -243,11 +244,15 @@
     const items = [];
     if (ME.person_id && ME.can_edit_profile) items.push(['My account'], ['profile', '✎', 'Edit my profile']);
     else items.push(['My account']);
-    items.push(['password', '🔑', 'Change password']);
+    items.push(['password', '🔑', 'Change password'], ['security', '🛡', 'Devices & security']);
     if (ME.role === 'admin'){
-      items.push(['Administration'], ['overview', '◧', 'Overview'], ['accounts', '👤', 'Accounts'], ['people', '☷', 'People & profiles'], ['import', '⇪', 'Import data (JSON)'],
-                 ['notices', '📌', 'Notices & events'], ['email', '✉', 'Send e-mail'], ['lists', '☰', 'Mailing lists'],
-                 ['activity', '⟲', 'Activity log'], ['export', '⬇', 'Export for website']);
+      items.push(['Administration'], ['overview', '◧', 'Overview'], ['accounts', '👤', 'Accounts'], ['people', '☷', 'People & profiles'], ['scholars', '🎓', 'Research scholars'],
+                 ['import', '⇪', 'Import data (JSON)'], ['notices', '📌', 'Notices & events'], ['gallery', '🖼', 'Gallery'], ['email', '✉', 'Send e-mail'], ['lists', '☰', 'Mailing lists'],
+                 ['activity', '⟲', 'Activity log'], ['export', '⬇', 'Export for website'], ['backup', '🗄', 'Backup & restore']);
+    } else if (ME.role === 'notices'){
+      items.push(['Content editor'], ['notices', '📌', 'Notices & events'], ['gallery', '🖼', 'Gallery']);
+    } else if (ME.role === 'people'){
+      items.push(['People editor'], ['people', '☷', 'People & profiles'], ['scholars', '🎓', 'Research scholars']);
     }
     buildNav(items);
     window.addEventListener('hashchange', route);
@@ -260,7 +265,7 @@
   }
 
   function route(){
-    const raw = location.hash.slice(1) || (ME.role === 'admin' ? 'overview' : (ME.person_id && ME.can_edit_profile ? 'profile' : 'password'));
+    const raw = location.hash.slice(1) || (ME.role === 'admin' ? 'overview' : ME.role === 'notices' ? 'notices' : ME.role === 'people' ? 'people' : (ME.person_id && ME.can_edit_profile ? 'profile' : 'password'));
     const [name, arg] = raw.split('/');
     if (dirty && !confirm('You have unsaved changes. Leave without saving?')){
       history.replaceState(null, '', '#' + (route.last || ''));
@@ -399,6 +404,7 @@
           input(L('grade', 'Grade (optional)', 'text', {ph: 'Grade-I'}), p.grade) +
           input(L('status', 'Status', 'select', {options: opts([['current', 'Current'], ['former', 'Former (retired / left)'], ['alumni', 'Alumni (completed)'], ['sample', 'Hidden / sample']])}), p.status) +
           input(L('supervisor', 'Supervisor / mentor', 'select', {blank: 1, options: people.filter(x => ['faculty', 'adjunct'].includes(x.type)).map(x => [x.id, x.name])}), p.supervisor) +
+          input(L('joined', 'Joined (year) – decides seniority order'), p.joined) +
           input(L('year', 'Year (joined / completed)'), p.year) +
           input(L('now', 'Current position (former / alumni)', 'text', {full: 1}), p.now) +
           input(L('profile', 'Official IIT KGP profile URL', 'url', {full: 1}), p.profile) +
@@ -606,11 +612,20 @@
       '</div>' +
       '<div class="card"><h3>Settings in use</h3>' + warn.map(w => '<p class="hint">' + w + '</p>').join('') +
       '<p class="hint">Invitations: <b>' + (s.invite_mode === 'password' ? 'temporary password by e-mail' : 'set-password link by e-mail') + '</b>. Portal address: <b>' + esc(s.base_url) + '</b>.</p></div>' +
+      '<div class="card" id="healthCard"><h3>Things to fix</h3><p class="hint">Checking…</p></div>' +
       '<div class="card"><h3>Common tasks</h3><p class="hint">' +
       '• <a href="#accounts">Create an account</a> for a faculty member and link it to their profile — they get an e-mail to set their password.<br>' +
       '• <a href="#notices">Post a notice or seminar</a> — it appears on the home page Notice Board and News &amp; Events.<br>' +
       '• <a href="#people">Move someone to Former Faculty / Alumni</a> — edit their profile and change Status.<br>' +
       '• <a href="#email">E-mail a group</a> — all faculty, research scholars, students on a mailing list, …</p></div>';
+    api('GET', '/admin/health').then(h => {
+      const li = (t, arr, link) => arr.length ? '<li><b>' + arr.length + '</b> ' + t + ': ' + arr.slice(0, 8).map(x => typeof x === 'string' ? esc(x) : '<a href="#person/' + esc(x.id) + '">' + esc(x.name || x.title) + '</a>').join(', ') + (arr.length > 8 ? ' …' : '') + '</li>' : '';
+      const rows = li('faculty / staff without an e-mail', h.faculty_no_email) + li('faculty without a photo', h.faculty_no_photo) + li('faculty without a biography', h.faculty_no_bio) +
+        li('scholars without a supervisor', h.scholars_no_supervisor) + (h.scholars_no_roll ? '<li><b>' + h.scholars_no_roll + '</b> of ' + h.scholars_total + ' scholars have no roll number – <a href="#scholars">fill them in</a></li>' : '') +
+        li('accounts that never logged in', h.never_logged_in) + li('invitations not accepted', h.invites_pending) +
+        (h.notices_expiring.length ? '<li><b>' + h.notices_expiring.length + '</b> notice(s) expire within 7 days: ' + h.notices_expiring.map(n => esc(n.title) + ' (' + esc(n.expires) + ')').join('; ') + '</li>' : '');
+      $('#healthCard').innerHTML = '<h3>Things to fix</h3>' + (rows ? '<ul class="hint">' + rows + '</ul>' : '<p class="hint">Nothing to fix. ✓</p>') + '<p class="hint">' + h.notices_live + ' notice(s) are live on the website.</p>';
+    }).catch(() => {});
   };
 
   /* ---------------- admin: accounts ---------------- */
@@ -630,7 +645,7 @@
         '<label>Official e-mail<input type="email" name="email" required placeholder="name@' + esc(d.domains[0] || 'iitkgp.ac.in') + '"></label>' +
         '<label>Link to profile <span class="field-note">(research scholars can’t have accounts – the admin edits their profiles)</span><select name="person_id">' + peopleOpts + '</select></label>' +
         '<label>Display name <span class="field-note">(optional – taken from the profile)</span><input name="name"></label>' +
-        '<label>Role<select name="role"><option value="member">Member – edits own profile</option><option value="admin">Admin – full access</option></select></label>' +
+        '<label>Role<select name="role"><option value="member">Member – edits own profile</option><option value="admin">Admin – full access</option><option value="notices">Content editor – notices, events, gallery only</option><option value="people">People editor – profiles and scholars only</option></select></label>' +
         '<label class="check full"><input type="checkbox" name="send_invite" checked> Send the invitation e-mail now</label>' +
       '</div><div><button class="btn btn-maroon" type="submit">Create account</button></div></form></div>' +
       '<div class="card"><h3>Create several accounts</h3><p class="hint">One per line: <code>e-mail, profile-id</code> (profile id is optional — find it in People &amp; profiles). Invitations are sent to each.</p>' +
@@ -641,13 +656,14 @@
         const [cls, txt] = statusOf(u);
         return '<tr data-row="' + esc((u.email + ' ' + u.name + ' ' + (u.person_id || '')).toLowerCase()) + '"><td><strong>' + esc(u.email) + '</strong><br><small>' + esc(u.name) + '</small></td>' +
           '<td>' + (u.person_id ? '<a href="#person/' + esc(u.person_id) + '">' + esc(personName(u.person_id)) + '</a>' : '<small>—</small>') + '</td>' +
-          '<td>' + (u.role === 'admin' ? '<span class="role-chip admin">Admin</span>' : '<span class="role-chip">Member</span>') + '</td>' +
+          '<td>' + ('<span class="role-chip' + (u.role === 'admin' ? ' admin' : '') + '">' + esc(ROLE_LABEL[u.role] || u.role) + '</span>') + '</td>' +
           '<td><span class="pill-status st-' + cls + '">' + txt + '</span></td><td><small>' + fmtDate(u.last_login) + '</small></td>' +
           '<td class="actions">' +
             '<button class="btn btn-light btn-sm" data-u="' + u.id + '" data-a="invite" title="Send a new invitation / set-password e-mail">Re-send invite</button>' +
             (u.locked ? '<button class="btn btn-light btn-sm" data-u="' + u.id + '" data-a="unlock">Unlock</button>' : '') +
             '<button class="btn btn-light btn-sm" data-u="' + u.id + '" data-a="link">Link profile</button>' +
-            (u.id !== ME.id ? '<button class="btn btn-light btn-sm" data-u="' + u.id + '" data-a="role">' + (u.role === 'admin' ? 'Make member' : 'Make admin') + '</button>' +
+            (u.id !== ME.id ? '<button class="btn btn-light btn-sm" data-u="' + u.id + '" data-a="role">' + 'Change role</button>' +
+              '<button class="btn btn-light btn-sm" data-u="' + u.id + '" data-a="logout" title="Log this person out of every device">Log out everywhere</button>' +
               '<button class="btn btn-light btn-sm" data-u="' + u.id + '" data-a="toggle">' + (u.active ? 'Disable' : 'Enable') + '</button>' +
               '<button class="btn btn-danger btn-sm" data-u="' + u.id + '" data-a="delete">Delete</button>' : '') +
           '</td></tr>';
@@ -683,7 +699,12 @@
       try {
         if (a === 'invite'){ if (!confirm('Send a new invitation e-mail to ' + u.email + '? Any earlier link stops working.')) return; await api('POST', '/admin/users/' + id + '/invite'); toast('Invitation sent.'); }
         if (a === 'unlock'){ await api('PUT', '/admin/users/' + id, {unlock: true}); toast('Unlocked.'); }
-        if (a === 'role'){ await api('PUT', '/admin/users/' + id, {role: u.role === 'admin' ? 'member' : 'admin'}); toast('Role changed.'); }
+        if (a === 'role'){
+          const r = prompt('Role for ' + u.email + ':\nmember = edits own profile\nadmin = full access\nnotices = notices, events, gallery only\npeople = profiles and scholars only', u.role);
+          if (r === null) return;
+          await api('PUT', '/admin/users/' + id, {role: r.trim().toLowerCase()}); toast('Role changed.');
+        }
+        if (a === 'logout'){ await api('POST', '/admin/users/' + id + '/logout'); toast('Logged out of all devices.'); }
         if (a === 'toggle'){ await api('PUT', '/admin/users/' + id, {active: !u.active}); toast(u.active ? 'Account disabled.' : 'Account enabled.'); }
         if (a === 'delete'){ if (!confirm('Delete the account ' + u.email + '? Their public profile is NOT deleted.')) return; await api('DELETE', '/admin/users/' + id); toast('Account deleted.'); }
         if (a === 'link'){
@@ -743,6 +764,16 @@
       // switching type changes the designation control
       const typeSel = $('[data-sec="admin"] [data-f="type"]');
       typeSel.addEventListener('change', () => { Object.assign(p, collectProfile($('#editor'), p)); draw(); markDirty(); });
+      const delBtn = $('#delPerson');
+      delBtn.insertAdjacentHTML('beforebegin', '<button class="btn btn-light btn-sm" id="histBtn">Previous versions</button>');
+      $('#histBtn').addEventListener('click', async () => {
+        const v = (await api('GET', '/admin/people/' + encodeURIComponent(p.id) + '/versions')).versions;
+        if (!v.length){ toast('No earlier versions yet.'); return; }
+        const pick = prompt('Restore an earlier version of this profile. Type its number:\n\n' + v.map((x, i) => (i + 1) + ') ' + fmtDate(x.at) + ' by ' + (x.by || '?')).join('\n'));
+        const i = parseInt(pick, 10); if (!(i >= 1 && i <= v.length)) return;
+        const r = await api('POST', '/admin/people/' + encodeURIComponent(p.id) + '/restore', {version: v[i - 1].id});
+        Object.assign(p, r.profile); dirty = false; toast('Earlier version restored.'); VIEWS.person(p.id);
+      });
       $('#delPerson').addEventListener('click', async () => {
         if (!confirm('Delete ' + (p.name || p.id) + ' from the website completely? To keep their profile online instead, set Status to “Former” or “Alumni”.')) return;
         try { await api('DELETE', '/admin/people/' + encodeURIComponent(p.id)); dirty = false; location.hash = 'people'; toast('Deleted.'); }
@@ -767,7 +798,8 @@
     const state = x => x.draft ? ['pending', 'Draft'] : (x.expires && x.expires < today) ? ['disabled', 'Expired'] : ['active', 'Live'];
 
     $('#view').innerHTML = head('Notices & events', 'Notices appear on the home page Notice Board and on News &amp; Events. Events (seminars, colloquia, workshops) also appear under “Upcoming events” until their date has passed.') +
-      '<div class="card"><h3>' + (editing ? 'Edit notice' : 'Post a new notice or event') + '</h3><form class="pform" id="nForm" novalidate>' +
+      '<div class="card"><h3>' + (editing ? 'Edit notice' : 'Post a new notice or event') + '</h3>' +
+        (editing ? '' : '<p class="hint">Quick start: <button type="button" class="btn btn-light btn-sm" id="semTpl">Seminar / colloquium form</button></p>') + '<form class="pform" id="nForm" novalidate>' +
         '<div class="pgrid pgrid-3">' +
           '<label>Kind<select name="kind"><option value="notice"' + (n.kind !== 'event' ? ' selected' : '') + '>Notice / announcement</option><option value="event"' + (n.kind === 'event' ? ' selected' : '') + '>Event (seminar, workshop…)</option></select></label>' +
           '<label>Tag<input name="tag" list="tagList" value="' + esc(n.tag || '') + '" placeholder="Seminar, Admissions…"><datalist id="tagList">' + TAGS.map(t => '<option value="' + t + '">').join('') + '</datalist></label>' +
@@ -780,10 +812,15 @@
           '<label class="ev">End date (multi-day)<input type="date" name="end_date" value="' + esc(n.end_date || '') + '"></label>' +
           '<label>Link (page, PDF or URL)<input name="link" value="' + esc(n.link || '') + '" placeholder="https://… or a PDF link"></label>' +
           '<label class="full">Details (optional)<textarea name="body" rows="4">' + esc(n.body || '') + '</textarea></label>' +
+          '<label>Show from (publish on)<input type="date" name="publish_on" value="' + esc(n.publish_on || '') + '"></label>' +
           '<label>Remove automatically after<input type="date" name="expires" value="' + esc(n.expires || '') + '"></label>' +
+          '<label class="full">Attach a PDF or image <span class="field-note">(becomes the notice link)</span><input type="file" id="nFile" accept=".pdf,image/*">' +
+            '<span class="field-note" id="nFileInfo">' + (n.attachment ? 'Attached: ' + esc(n.attachment) : '') + '</span></label>' +
+          '<label class="check"><input type="checkbox" name="urgent"' + (n.urgent ? ' checked' : '') + '> Mark as urgent</label>' +
           '<label class="check"><input type="checkbox" name="is_new"' + (n.is_new ? ' checked' : '') + '> Show “New” badge</label>' +
           '<label class="check"><input type="checkbox" name="pinned"' + (n.pinned ? ' checked' : '') + '> Pin to top</label>' +
           '<label class="check"><input type="checkbox" name="draft"' + (n.draft ? ' checked' : '') + '> Save as draft (hidden)</label>' +
+        (!editing && ME.role === 'admin' ? '<label class="check"><input type="checkbox" id="nMail"> E-mail this to: <select id="nMailGrp"><option value="faculty">Faculty</option><option value="scholar">Research scholars</option><option value="staff">Staff</option></select></label>' : '') +
         '</div><div class="view-actions"><button class="btn btn-maroon" type="submit">' + (editing ? 'Save changes' : 'Publish') + '</button>' +
         (editing ? '<a class="btn btn-light" href="#notices">Cancel</a>' : '') + '</div></form></div>' +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date</th><th>Title</th><th>Kind / tag</th><th>State</th><th></th></tr></thead><tbody>' +
@@ -796,14 +833,31 @@
     const form = $('#nForm'), f = form.elements;
     const syncKind = () => $$('.ev', form).forEach(el => el.hidden = f.kind.value !== 'event');
     f.kind.addEventListener('change', syncKind); syncKind();
+    let attachment = n.attachment || '';
+    $('#nFile').addEventListener('change', async e => {
+      const file = e.target.files[0]; if (!file) return;
+      try {
+        const r = await api('POST', '/admin/notice-file', {name: file.name, data: await readAsDataURL(file)});
+        attachment = r.attachment || r.path; $('#nFileInfo').textContent = 'Attached: ' + attachment; if (!f.link.value) f.link.value = attachment;
+      } catch (err) { toast(err.message, true); }
+    });
+    const sem = $('#semTpl');
+    if (sem) sem.addEventListener('click', () => { f.kind.value = 'event'; f.tag.value = 'Seminar'; syncKind(); f.title.focus();
+      f.body.value = 'Abstract:\n\nAbout the speaker:\n'; });
     form.addEventListener('submit', async e => {
       e.preventDefault();
       const body = {};
-      ['kind', 'tag', 'date', 'title', 'speaker', 'affiliation', 'time', 'venue', 'end_date', 'link', 'body', 'expires'].forEach(k => { const v = f[k].value.trim(); if (v) body[k] = v; });
-      ['is_new', 'pinned', 'draft'].forEach(k => { if (f[k].checked) body[k] = true; });
+      ['kind', 'tag', 'date', 'title', 'speaker', 'affiliation', 'time', 'venue', 'end_date', 'link', 'body', 'expires', 'publish_on'].forEach(k => { const v = f[k].value.trim(); if (v) body[k] = v; });
+      ['is_new', 'pinned', 'draft', 'urgent'].forEach(k => { if (f[k].checked) body[k] = true; });
+      if (attachment) body.attachment = attachment;
       const btn = form.querySelector('button[type=submit]'); busy(btn, true, 'Saving…');
       try {
         if (editing) await api('PUT', '/admin/notices/' + editing.id, body); else await api('POST', '/admin/notices', body);
+        const mailBox = $('#nMail');
+        if (!editing && mailBox && mailBox.checked && !body.draft){
+          const lines = [body.title, body.speaker ? 'Speaker: ' + body.speaker + (body.affiliation ? ' (' + body.affiliation + ')' : '') : '', body.date ? 'Date: ' + body.date : '', body.time ? 'Time: ' + body.time : '', body.venue ? 'Venue: ' + body.venue : '', '', body.body || ''].filter((x, i) => x || i === 5);
+          try { await api('POST', '/admin/mail', {groups: [$('#nMailGrp').value], emails: [], subject: (body.tag ? body.tag + ': ' : '') + body.title, body: lines.join('\n')}); toast('E-mail is being sent.'); } catch (err) { toast('Notice saved, but the e-mail failed: ' + err.message, true); }
+        }
         toast(editing ? 'Notice updated.' : 'Published. It is now on the website.');
         if (location.hash !== '#notices') location.hash = 'notices'; else VIEWS.notices();
       } catch (err) { alertBox(esc(err.message)); busy(btn, false); }
@@ -972,6 +1026,141 @@
   };
 
   /* ------------------------------------------------------------------ */
+
+  /* ---------------- scholars: table editing, graduation, CSV import ---------------- */
+  VIEWS.scholars = async function(){
+    const d = await api('GET', '/admin/scholars');
+    const fac = d.faculty, rows = d.scholars;
+    const changed = {};
+    const supOpts = sel => '<option value="">—</option>' + fac.map(f => '<option value="' + esc(f.id) + '"' + (f.id === sel ? ' selected' : '') + '>' + esc(f.name) + '</option>').join('');
+    $('#view').innerHTML = head('Research scholars', 'Edit supervisor, roll number, official e-mail, office and joining year in one table. Scholars appear in their supervisor’s profile, numbered by seniority (joining year, then roll number).',
+        '<button class="btn btn-maroon btn-sm" id="schSave" disabled>Save changes</button>') +
+      '<div class="toolbar"><input type="search" id="sFilter" placeholder="Search name…"><select id="sSup"><option value="">All supervisors</option>' + fac.map(f => '<option value="' + esc(f.id) + '">' + esc(f.name) + '</option>').join('') + '</select>' +
+        '<select id="sStat"><option value="current">Current</option><option value="alumni">Alumni</option><option value="">All</option></select>' +
+        '<button class="btn btn-light btn-sm" id="schGrad">Mark selected as graduated…</button></div>' +
+      '<div class="ptable-wrap"><table class="ptable"><thead><tr><th></th><th>Name</th><th>Supervisor</th><th>Roll no.</th><th>Official e-mail</th><th>Office</th><th>Joined</th></tr></thead><tbody>' +
+      rows.map(p => '<tr data-id="' + esc(p.id) + '" data-row="' + esc((p.name || '').toLowerCase()) + '" data-sup="' + esc(p.supervisor || '') + '" data-status="' + esc(p.status) + '">' +
+        '<td><input type="checkbox" data-sel></td><td><strong>' + esc(p.name) + '</strong></td>' +
+        '<td><select data-k="supervisor">' + supOpts(p.supervisor) + '</select></td>' +
+        '<td><input data-k="roll" value="' + esc(p.roll || '') + '" size="11"></td><td><input data-k="email" value="' + esc(p.email || '') + '" size="26"></td>' +
+        '<td><input data-k="office" value="' + esc(p.office || '') + '" size="14"></td><td><input data-k="joined" value="' + esc(p.joined || (p.status === 'current' ? p.year : '') || '') + '" size="5"></td></tr>').join('') +
+      '</tbody></table></div>' +
+      '<div class="card"><h3>Import from a spreadsheet (CSV)</h3><p class="hint">Save your Excel sheet as <b>CSV</b>. First row must be headings from: <code>name, supervisor, roll, email, office, joined, topic, cosupervisor</code>. <code>supervisor</code> can be the professor’s name. Existing scholars are updated, new ones are added.</p>' +
+      '<input type="file" id="csvFile" accept=".csv,text/csv"> <button class="btn btn-maroon btn-sm" id="csvGo">Import</button><div id="csvOut" class="hint"></div></div>';
+    const apply = () => {
+      const v = $('#sFilter').value.toLowerCase(), s = $('#sSup').value, st = $('#sStat').value;
+      $$('tbody tr[data-id]').forEach(r => r.hidden = !(r.dataset.row.includes(v) && (!s || r.dataset.sup === s) && (!st || r.dataset.status === st)));
+    };
+    ['#sFilter', '#sSup', '#sStat'].forEach(x => $(x).addEventListener('input', apply)); apply();
+    $('#view').addEventListener('input', e => {
+      const el = e.target.closest('[data-k]'); if (!el) return;
+      const tr = el.closest('tr'), id = tr.dataset.id;
+      (changed[id] = changed[id] || {})[el.dataset.k] = el.value.trim();
+      if (el.dataset.k === 'supervisor') tr.dataset.sup = el.value;
+      $('#schSave').disabled = false; el.style.background = '#fff6dd';
+    });
+    $('#schSave').addEventListener('click', async () => {
+      const updates = Object.keys(changed).map(id => ({id, fields: changed[id]}));
+      try { const r = await api('POST', '/admin/people-bulk', {updates}); toast(r.changed + ' scholar(s) updated.'); VIEWS.scholars(); } catch (err) { toast(err.message, true); }
+    });
+    $('#schGrad').addEventListener('click', async () => {
+      const ids = $$('[data-sel]:checked').map(x => x.closest('tr').dataset.id);
+      if (!ids.length){ toast('Tick the scholars first.', true); return; }
+      const year = prompt('Year of completion for these ' + ids.length + ' scholar(s):', String(new Date().getFullYear())); if (!year) return;
+      try { await api('POST', '/admin/people-bulk', {graduate: {ids, year}}); toast('Moved to Alumni.'); VIEWS.scholars(); } catch (err) { toast(err.message, true); }
+    });
+    $('#csvGo').addEventListener('click', async () => {
+      const file = $('#csvFile').files[0]; if (!file){ toast('Choose a CSV file first.', true); return; }
+      const text = await file.text();
+      const parse = t => { const out = []; let row = [], cur = '', q = false;
+        for (let i = 0; i < t.length; i++){ const c = t[i];
+          if (q){ if (c === '"' && t[i + 1] === '"'){ cur += '"'; i++; } else if (c === '"') q = false; else cur += c; }
+          else if (c === '"') q = true; else if (c === ',' || c === '\t'){ row.push(cur); cur = ''; }
+          else if (c === '\n' || c === '\r'){ if (c === '\r' && t[i + 1] === '\n') i++; row.push(cur); cur = ''; if (row.some(x => x.trim())) out.push(row); row = []; }
+          else cur += c; }
+        row.push(cur); if (row.some(x => x.trim())) out.push(row); return out; };
+      const tbl = parse(text.replace(/^﻿/, '')); if (tbl.length < 2){ toast('The file has no data rows.', true); return; }
+      const hd = tbl[0].map(h => h.trim().toLowerCase());
+      const slug = n => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const facBy = {}; fac.forEach(f => { facBy[f.id] = f.id; facBy[f.name.toLowerCase()] = f.id; facBy[f.name.toLowerCase().replace(/^(prof\.?|dr\.?)\s+/, '')] = f.id; });
+      const recs = [], warn = [];
+      tbl.slice(1).forEach((r, i) => {
+        const o = {}; hd.forEach((h, j) => { if (r[j] && r[j].trim()) o[h] = r[j].trim(); });
+        if (!o.name){ return; }
+        const rec = {name: o.name, id: slug(o.name), type: 'scholar'};
+        ['roll', 'email', 'office', 'joined', 'topic', 'cosupervisor'].forEach(k => { if (o[k]) rec[k] = o[k]; });
+        if (o.supervisor){ const sid = facBy[o.supervisor.toLowerCase()] || facBy[o.supervisor.toLowerCase().replace(/^(prof\.?|dr\.?)\s+/, '')]; if (sid) rec.supervisor = sid; else warn.push('Row ' + (i + 2) + ': supervisor “' + o.supervisor + '” not found'); }
+        recs.push(rec);
+      });
+      try {
+        const r = (await api('POST', '/admin/import', {data: recs})).report;
+        $('#csvOut').innerHTML = '<b>' + r.created.length + ' added, ' + r.updated.length + ' updated.</b>' + (warn.concat(r.errors).length ? '<br>' + warn.concat(r.errors).map(esc).join('<br>') : '');
+        toast('Import finished.');
+      } catch (err) { toast(err.message, true); }
+    });
+  };
+
+  /* ---------------- gallery manager ---------------- */
+  VIEWS.gallery = async function(){
+    const d = await api('GET', '/admin/gallery');
+    let items = d.items;
+    const draw = () => {
+      $('#view').innerHTML = head('Gallery', 'Photos shown on the Gallery page. Tick “Home slideshow” to also show a photo in the home page hero (3 seconds each, after the Head’s message).',
+          '<button class="btn btn-maroon btn-sm" id="gSave">Save order & captions</button>') +
+        '<div class="card"><h3>Upload a photo</h3><form class="pform" id="gUp"><div class="pgrid pgrid-3">' +
+          '<label>Photo (JPG / PNG / WebP, up to 6 MB)<input type="file" name="file" accept="image/*" required></label>' +
+          '<label>Caption<input name="title"></label><label>Album<input name="album" value="Events" list="albums"><datalist id="albums">' + [...new Set(items.map(x => x.album).filter(Boolean))].map(a => '<option value="' + esc(a) + '">').join('') + '</datalist></label>' +
+          '<label>Date (optional)<input name="date" placeholder="Nov 2026"></label>' +
+          '<label class="check"><input type="checkbox" name="hero"> Home slideshow</label></div><div><button class="btn btn-maroon" type="submit">Upload</button></div></form></div>' +
+        '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Photo</th><th>Caption</th><th>Album</th><th>Home</th><th></th></tr></thead><tbody>' +
+        (items.length ? items.map((x, i) => '<tr data-i="' + i + '"><td><img src="../' + esc(x.src) + '" alt="" style="width:90px;height:60px;object-fit:cover' + (x.exists === false ? ';opacity:.3' : '') + '">' + (x.exists === false ? '<br><small>file missing</small>' : '') + '</td>' +
+          '<td><input data-k="title" value="' + esc(x.title) + '"></td><td><input data-k="album" value="' + esc(x.album) + '" size="12"></td>' +
+          '<td><input type="checkbox" data-k="hero"' + (x.hero ? ' checked' : '') + '></td>' +
+          '<td class="actions"><button class="btn btn-light btn-sm" data-m="up">↑</button><button class="btn btn-light btn-sm" data-m="down">↓</button><button class="btn btn-danger btn-sm" data-m="del">Delete</button></td></tr>').join('') : '<tr><td colspan="5"><small>No photos yet.</small></td></tr>') + '</tbody></table></div>';
+      const sync = () => $$('tbody tr[data-i]').forEach(tr => { const it = items[+tr.dataset.i]; $$('[data-k]', tr).forEach(el => { it[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value; }); });
+      $('#gUp').addEventListener('submit', async e => {
+        e.preventDefault(); const f = e.target, file = f.file.files[0];
+        const btn = f.querySelector('button'); busy(btn, true, 'Uploading…');
+        try { await api('POST', '/admin/gallery/upload', {name: file.name, data: await readAsDataURL(file), title: f.title.value, album: f.album.value, date: f.date.value, hero: f.hero.checked}); toast('Uploaded.'); VIEWS.gallery(); }
+        catch (err) { toast(err.message, true); busy(btn, false); }
+      });
+      $$('[data-m]').forEach(b => b.addEventListener('click', async () => {
+        sync(); const i = +b.closest('tr').dataset.i, m = b.dataset.m;
+        if (m === 'del'){ if (!confirm('Delete this photo?')) return; await api('POST', '/admin/gallery/delete', {src: items[i].src}); items.splice(i, 1); }
+        else { const j = m === 'up' ? i - 1 : i + 1; if (j < 0 || j >= items.length) return; [items[i], items[j]] = [items[j], items[i]]; }
+        draw();
+      }));
+      $('#gSave').addEventListener('click', async () => { sync(); try { await api('PUT', '/admin/gallery', {items}); toast('Saved.'); } catch (err) { toast(err.message, true); } });
+    };
+    draw();
+  };
+
+  /* ---------------- backup & restore ---------------- */
+  VIEWS.backup = function(){
+    $('#view').innerHTML = head('Backup & restore', 'Everything in the portal (people, notices, gallery list, accounts, uploads) in one file.') +
+      '<div class="card"><h3>Download a backup</h3><p class="hint">Keep this file safe – it contains accounts. The server also keeps a daily copy of the database (last 14 days) in <code>backend/data/backups/</code>.</p>' +
+      '<a class="btn btn-maroon" href="../api/admin/backup.zip">⬇ Download backup</a></div>' +
+      '<div class="card"><h3>Restore from a backup</h3><p class="hint"><b>This replaces everything currently in the portal.</b> A safety copy of the current database is saved first. You will be asked to log in again.</p>' +
+      '<input type="file" id="rFile" accept=".zip"> <button class="btn btn-danger btn-sm" id="rGo">Restore</button></div>';
+    $('#rGo').addEventListener('click', async () => {
+      const file = $('#rFile').files[0]; if (!file){ toast('Choose a backup .zip first.', true); return; }
+      if (!confirm('Replace ALL portal data with this backup?')) return;
+      try { await api('POST', '/admin/restore', {data: await readAsDataURL(file)}); alert('Restored. Please log in again.'); location.replace('login.html'); }
+      catch (err) { toast(err.message, true); }
+    });
+  };
+
+  /* ---------------- devices & security ---------------- */
+  VIEWS.security = async function(){
+    const d = await api('GET', '/me/sessions');
+    $('#view').innerHTML = head('Devices & security', 'Places where your account is currently logged in. If you see something you do not recognise, log out the other devices and change your password.',
+        '<button class="btn btn-danger btn-sm" id="outOthers">Log out all other devices</button>') +
+      '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Logged in</th><th>Network address</th><th>Expires</th><th></th></tr></thead><tbody>' +
+      d.sessions.map(s => '<tr><td>' + fmtDate(s.created) + '</td><td>' + esc(s.ip || '—') + '</td><td>' + fmtDate(s.expires) + '</td><td>' + (s.current ? '<span class="pill-status st-active">This device</span>' : '') + '</td></tr>').join('') + '</tbody></table></div>' +
+      '<p class="hint">Sessions end automatically after a few hours. Accounts lock for 15 minutes after repeated wrong passwords.</p>';
+    $('#outOthers').addEventListener('click', async () => { await api('POST', '/me/logout-others'); toast('Other devices logged out.'); VIEWS.security(); });
+  };
+
   if (page === 'login') initLogin();
   if (page === 'set-password') initSetPassword();
   if (page === 'forgot') initForgot();

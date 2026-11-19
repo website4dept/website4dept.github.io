@@ -302,17 +302,21 @@
     const patents = ul(p.patents, x => '<strong>' + esc(x.title) + '</strong>' + (x.number ? ', ' + esc(x.number) : '') + (x.status ? ' – ' + esc(x.status) : '') + (x.year ? ' (' + esc(x.year) + ')' : ''));
     const consultancy = ul(p.consultancy, x => '<strong>' + esc(x.title) + '</strong>' + (x.client ? ', ' + esc(x.client) : '') + (x.from || x.to ? ' (' + years(x.from, x.to) + ')' : ''));
 
+    // seniority: earlier joining year first (year field, else the first 2 digits of the roll no.), then listing order
+    const joinYear = x => { const y = parseInt(x.joined || x.year, 10); if (y > 1900) return y; const m = /^(\d{2})/.exec(x.roll || ''); return m ? 2000 + parseInt(m[1], 10) : 9999; };
     // students: people in the data file who list this person as supervisor + any extra entries
-    const supervised = PEOPLE.filter(x => x.supervisor === p.id);
+    const supervised = PEOPLE.map((x, i) => [x, i]).filter(a => a[0].supervisor === p.id)
+      .sort((a, b) => (joinYear(a[0]) - joinYear(b[0])) || (a[1] - b[1])).map(a => a[0]);
     const extra = arr(p.students);
     const studentRows = (status, level) => {
       const fromData = supervised.filter(x => (status === 'current' ? x.status === 'current' : x.status === 'alumni') &&
                                               (level === 'postdoc' ? x.type === 'postdoc' : x.type === 'scholar'))
-        .map(x => ['<a href="' + profileUrl(x) + '">' + esc(x.name) + '</a>', esc((x.areas || []).map(a => AREAS[a]).filter(Boolean).join(', ') || x.topic || ''), esc(x.year || ''), esc(x.now || '')]);
+        .map(x => ['<a href="' + profileUrl(x) + '">' + esc(x.name) + '</a>', esc((x.areas || []).map(a => AREAS[a]).filter(Boolean).join(', ') || x.topic || ''), esc((x.status === 'current' ? (x.joined || x.year) : x.year) || ''), esc(x.now || '')]);
       const fromExtra = extra.filter(x => (x.status || 'current') === status && (x.level || 'PhD').toLowerCase() === (level === 'postdoc' ? 'postdoc' : 'phd'))
         .map(x => [esc(x.name), esc(x.topic || ''), esc(x.year || ''), esc(x.now || '')]);
       return fromData.concat(fromExtra);
     };
+    const numbered = rows => rows.map((r, i) => [String(i + 1)].concat(r));
     const masters = extra.filter(x => !['phd', 'postdoc'].includes((x.level || 'PhD').toLowerCase()))
       .map(x => [esc(x.name), esc(x.level), esc(x.topic || ''), esc(x.year || '')]);
     const sCurPhd = studentRows('current', 'phd'), sOldPhd = studentRows('graduated', 'phd').concat(studentRows('alumni', 'phd'));
@@ -345,7 +349,7 @@
         block('Patents', patents, {hideEmpty: true}) +
         block('Collaborators', collab, {hideEmpty: true})},
       {id: 'students', label: 'Students', hide: !isFaculty, html:
-        block('Current Ph.D. scholars', table(sCurPhd, ['Name', 'Research area', 'Joined', '']), {count: sCurPhd.length || ''}) +
+        block('Current Ph.D. scholars', table(numbered(sCurPhd), ['#', 'Name', 'Research area', 'Joined', '']), {count: sCurPhd.length || ''}) +
         block('Ph.D. graduated', table(sOldPhd, ['Name', 'Thesis / area', 'Year', 'Current position']), {count: sOldPhd.length || ''}) +
         block('Postdoctoral fellows', table(sPd, ['Name', 'Research area', 'Year', 'Current position']), {count: sPd.length || ''}) +
         block('Master’s & BS-MS projects', table(masters, ['Name', 'Programme', 'Project', 'Year']), {count: masters.length || ''})},

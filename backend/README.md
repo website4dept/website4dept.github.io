@@ -141,3 +141,15 @@ python server.py test-mail E      send a test e-mail
 python server.py import file.json bulk-add scholars, postdocs, alumni or mailing-list contacts
 python server.py export [folder]  write people-data.js and notices-data.js
 ```
+
+---
+
+## New in this version
+
+* **Research scholars** (admin → *Research scholars*): edit supervisor, roll no., official e-mail, office and joining year in one table; tick scholars and *Mark selected as graduated*; import a CSV from Excel. A scholar listed under a supervisor automatically appears in that professor's *Students* tab, numbered by seniority (joining year → else first two digits of the roll no. → else list order). Fill the **Joined** year (or roll no.) to get the true seniority order.
+* **Notices**: *Show from* date, expiry, urgent badge, pin, draft, PDF/image attachment, a *Seminar* quick form, and optional e-mail to faculty/scholars/staff when you publish.
+* **Gallery**: upload photos, captions, albums, order, and *Home slideshow* tick – no file editing.
+* **Roles**: *Content editor* (notices, events, gallery only) and *People editor* (profiles and scholars only), besides Member and Admin. Set under Accounts → *Change role*.
+* **Backup & restore**: one-click download; the server also keeps a daily copy (last 14) in `data/backups/`. Every profile keeps its last 20 versions (*Previous versions* button on the edit page).
+* **Devices & security**: see active logins, *Log out all other devices*; admin can *Log out everywhere* for any account. Optional `"admin_ip_allowlist": ["10.1.", "203.0.113.5"]` in `config.json` limits admin access to those addresses (a trailing dot means "starts with").
+* **Overview → Things to fix**: missing e-mails/photos/bios, scholars without supervisor or roll no., accounts never used, notices expiring soon.

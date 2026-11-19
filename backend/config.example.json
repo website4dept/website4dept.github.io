@@ -25,6 +25,7 @@
     "staff"
   ],
   "secure_cookies": false,
+  "admin_ip_allowlist": [],
   "mail": {
     "mode": "console",
     "from_name": "Department of Mathematics, IIT Kharagpur",
