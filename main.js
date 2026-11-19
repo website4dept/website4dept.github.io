@@ -89,7 +89,7 @@ const pages = [
   {name:'Students › Student Activities',url:'students.html#activities',words:'activities colloquium seminars'},
   {name:'News & Events',url:'news-events.html',words:'announcements seminars lectures news academic events'},
   {name:'Publications',url:'publications.html',words:'research publications papers articles bibliography'},
-  {name:'Contact',url:'contact.html',words:'address contact mathematics department Kharagpur West Bengal'},
+  {name:'Contact Us',url:'contact.html',words:'contact us address phone telephone fax email e-mail office map location directions route railway station airport kolkata reach Kharagpur West Bengal'},
 ];
 const nav=document.getElementById('navLinks');
 function closeDropdowns(){document.querySelectorAll('.has-dropdown.open').forEach(d=>{d.classList.remove('open');const b=d.querySelector('.dropdown-toggle');if(b)b.setAttribute('aria-expanded','false');});}

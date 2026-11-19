@@ -40,7 +40,7 @@
       '<div class="fcol fcol-dept"><h4>Department</h4>' +
         '<a href="about.html">About</a><a href="people.html">People</a><a href="research.html">Research</a>' +
         '<a href="academics.html">Academics</a><a href="students.html">Students</a><a href="publications.html">Publications</a>' +
-        '<a href="news-events.html">News &amp; Events</a><a href="gallery.html">Gallery</a><a href="contact.html">Contact</a>' +
+        '<a href="news-events.html">News &amp; Events</a><a href="gallery.html">Gallery</a><a href="contact.html">Contact Us</a>' +
       '</div>' +
     '</div>' +
     '<div class="footer-bottom-wrap"><div class="content footer-bottom">' +
