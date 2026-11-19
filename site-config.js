@@ -23,7 +23,7 @@ window.DEPT_SITE = {
   email: "office@maths.iitkgp.ac.in",
 
   // bottom strip of the footer: copyright holder + web-team contact
-  webteam: { name: "WebTeam@MathsDept", email: "webmathsiitkgp@gmail.com" },
+  webteam: { name: "WebTeam@MathsDeptIITKGP", email: "webmathsiitkgp@gmail.com" },
 
   shortcuts: [
     { label: "ERP",                     url: "https://erp.iitkgp.ac.in" },
