@@ -214,6 +214,29 @@
     const isFaculty = ['faculty', 'adjunct'].includes(p.type);
     const t = titleOf(p);
 
+    /* ----- research scholars: short profile (supervisor, email, area, roll no., office) ----- */
+    if (p.type === 'scholar'){
+      const sv = p.supervisor && findPerson(p.supervisor);
+      const row = (k, v) => '<li><span>' + k + '</span>' + v + '</li>';
+      const area = areaPills(p) || (p.topic ? esc(p.topic) : '');
+      const r = [];
+      r.push(row('Supervisor', sv ? '<a href="' + profileUrl(sv) + '">' + esc(sv.name) + '</a>' : '—'));
+      if (p.cosupervisor) r.push(row('Co-supervisor', esc(p.cosupervisor)));
+      r.push(row('Official email', p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '—'));
+      r.push(row('Research area', p.topic ? esc(p.topic) : (area || '—')));
+      r.push(row('Roll no.', p.roll ? esc(p.roll) : '—'));
+      r.push(row('Office address', p.office ? esc(p.office) : '—'));
+      head.innerHTML =
+        '<div class="profile-head-grid">' + photoHTML(p, 'profile-photo') +
+          '<div><div class="eyebrow">Research Scholar</div><h2>' + esc(p.name) + '</h2>' +
+          '<p class="profile-title">Ph.D. Scholar, Department of Mathematics</p></div></div>';
+      body.innerHTML =
+        '<div class="profile-layout"><div class="profile-main"><div class="surface">' +
+          '<h3>Scholar details</h3><ul class="profile-contact scholar-simple">' + r.join('') + '</ul></div>' +
+          '<p class="profile-back"><a class="link-arrow" href="people.html#' + esc(p.id) + '">← Back to people directory</a></p></div></div>';
+      return;
+    }
+
     /* ----- header ----- */
     let badge = '';
     if (p.status === 'former') badge = '<span class="profile-badge">Former faculty</span>';

@@ -410,7 +410,7 @@
     html += section('Basic details', '<div class="pgrid" data-group="basic">' +
       input(L('name', 'Full name'), p.name) + input(L('email', 'Public e-mail', 'email'), p.email) +
       input(L('phone', 'Phone'), p.phone) + input(L('office', 'Office / room'), p.office) +
-      input(L('office_hours', 'Office hours'), p.office_hours) + input(L('website', 'Personal website', 'url'), p.website) +
+      input(L('office_hours', 'Office hours'), p.office_hours) + input(L('roll', 'Roll number (scholars)'), p.roll) + input(L('website', 'Personal website', 'url'), p.website) +
       input(L('responsibilities', 'Current roles shown under your name', 'textarea', {full: 1, rows: 2, note: 'one per line'}), (p.responsibilities || []).join('\n')) +
       '</div>', {open: !isAdmin, key: 'basic'});
 

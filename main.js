@@ -149,14 +149,17 @@ if(searchForm)searchForm.addEventListener('submit',e=>{e.preventDefault();render
   Promise.all(wanted.map(p=>new Promise(res=>{
     const im=new Image();im.onload=()=>res(p);im.onerror=()=>res(null);im.src=p.src;
   }))).then(list=>{
-    list.filter(Boolean).forEach((p,i)=>{
-      if(!templates.length)return;
+    const photos=list.filter(Boolean);
+    const n=Math.max(templates.length,photos.length);
+    for(let i=0;i<n;i++){
       const t=templates[i%templates.length].cloneNode(true);
       t.removeAttribute('data-photo-template');
-      const img=t.querySelector('img');img.src=p.src;img.alt=p.title||'';
-      const cap=t.querySelector('.hero-caption');if(cap&&p.title)cap.textContent=p.title;
+      const p=photos[i];
+      const media=t.querySelector('.hero-media'),img=t.querySelector('img');
+      if(p){img.src=p.src;img.alt=p.title||'';const cap=t.querySelector('.hero-caption');if(cap&&p.title&&i>=templates.length)cap.textContent=p.title;}
+      else{if(img)img.remove();if(media)media.classList.add('no-photo');}
       wrap.append(t);
-    });
+    }
     start();
   });
 
@@ -219,6 +222,22 @@ if(searchForm)searchForm.addEventListener('submit',e=>{e.preventDefault();render
       v.addEventListener('play',()=>{videoHold=true;setPaused(true);});
       v.addEventListener('ended',()=>{if(videoHold){videoHold=false;setPaused(false);}});
     });
+
+    // hold while someone is reading the Head's message (dialog open / touching or scrolling the panel)
+    const dlg=document.getElementById('hodDialog');
+    let dlgHold=false,touchTimer=null;
+    const holdOn=()=>{dlgHold=true;setPaused(true);};
+    const holdOff=()=>{if(dlgHold){dlgHold=false;if(!videoHold)setPaused(false);}};
+    if(dlg){
+      dlg.addEventListener('close',holdOff);
+      new MutationObserver(()=>{dlg.open?holdOn():holdOff();}).observe(dlg,{attributes:true,attributeFilter:['open']});
+    }
+    const hodPanel=hero.querySelector('.hod-panel');
+    if(hodPanel){
+      const touch=()=>{holdOn();clearTimeout(touchTimer);touchTimer=setTimeout(holdOff,15000);};
+      hodPanel.addEventListener('touchstart',touch,{passive:true});
+      hodPanel.addEventListener('wheel',touch,{passive:true});
+    }
 
     // pause while the pointer or keyboard focus is inside the hero
     hero.addEventListener('mouseenter',()=>hero.classList.add('is-hovered'));
