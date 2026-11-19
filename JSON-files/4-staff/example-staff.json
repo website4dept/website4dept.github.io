@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Firstname Lastname",
+    "type": "staff",
+    "designation": "Office Assistant",
+    "status": "current",
+    "email": "name@example.com",
+    "phone": "",
+    "office": "Department Office"
+  }
+]

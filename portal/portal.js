@@ -246,13 +246,13 @@
     else items.push(['My account']);
     items.push(['password', '🔑', 'Change password'], ['security', '🛡', 'Devices & security']);
     if (ME.role === 'admin'){
-      items.push(['Administration'], ['overview', '◧', 'Overview'], ['accounts', '👤', 'Accounts'], ['people', '☷', 'People & profiles'], ['scholars', '🎓', 'Research scholars'],
+      items.push(['Administration'], ['overview', '◧', 'Overview'], ['accounts', '👤', 'Accounts'], ['people', '☷', 'People & profiles'], ['scholars', '🎓', 'Research scholars'], ['students', '🧑‍🎓', 'Students'],
                  ['import', '⇪', 'Import data (JSON)'], ['notices', '📌', 'Notices & events'], ['gallery', '🖼', 'Gallery'], ['email', '✉', 'Send e-mail'], ['lists', '☰', 'Mailing lists'],
                  ['activity', '⟲', 'Activity log'], ['export', '⬇', 'Export for website'], ['backup', '🗄', 'Backup & restore']);
     } else if (ME.role === 'notices'){
       items.push(['Content editor'], ['notices', '📌', 'Notices & events'], ['gallery', '🖼', 'Gallery']);
     } else if (ME.role === 'people'){
-      items.push(['People editor'], ['people', '☷', 'People & profiles'], ['scholars', '🎓', 'Research scholars']);
+      items.push(['People editor'], ['people', '☷', 'People & profiles'], ['scholars', '🎓', 'Research scholars'], ['students', '🧑‍🎓', 'Students']);
     }
     buildNav(items);
     window.addEventListener('hashchange', route);
@@ -1131,6 +1131,46 @@
         draw();
       }));
       $('#gSave').addEventListener('click', async () => { sync(); try { await api('PUT', '/admin/gallery', {items}); toast('Saved.'); } catch (err) { toast(err.message, true); } });
+    };
+    draw();
+  };
+
+  /* ---------------- students (BS-MS / M.Sc. / M.Tech.) ---------------- */
+  VIEWS.students = async function(){
+    const d = await api('GET', '/admin/students');
+    let items = d.items, filt = 'all';
+    const PROG = {bsms: 'BS-MS', msc: 'M.Sc.', mtech: 'M.Tech.'};
+    const sel = (k, opts, v) => '<select data-k="' + k + '">' + opts.map(o => '<option value="' + o[0] + '"' + (o[0] === (v || '') ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
+    const draw = () => {
+      const shown = items.map((x, i) => [x, i]).filter(([x]) => filt === 'all' || x.programme === filt || (filt === 'alumni' && x.status === 'alumni'));
+      $('#view').innerHTML = head('Students', 'Current students (grouped by batch) and alumni with their placement, shown on the Students page. Keep it minimal: name, optional roll number, batch.',
+          '<button class="btn btn-maroon btn-sm" id="sSave">Save changes</button>') +
+        '<div class="card"><h3>Add a student</h3><form class="pform" id="sAdd"><div class="pgrid pgrid-3">' +
+          '<label>Name<input name="name" required></label><label>Roll no. (optional)<input name="roll"></label>' +
+          '<label>Programme<select name="programme"><option value="bsms">BS-MS</option><option value="msc">M.Sc.</option><option value="mtech">M.Tech.</option></select></label>' +
+          '<label>Batch (admission year)<input name="batch" type="number" min="1951" max="2100" placeholder="2024"></label></div><div><button class="btn btn-maroon" type="submit">Add</button></div></form></div>' +
+        '<div class="card"><h3>Import from a JSON file</h3><p class="hint">A list of students; existing ones (same programme, batch and name) are updated, new ones added. Per-batch files (programme and batch written once at the top) work too; see <code>JSON-files/5-alumni</code> and <code>JSON-files/6-students-current</code>.</p>' +
+          '<input type="file" id="sFile" accept=".json,application/json"></div>' +
+        '<p class="hint">Show: ' + [['all', 'All'], ['bsms', 'BS-MS'], ['msc', 'M.Sc.'], ['mtech', 'M.Tech.'], ['alumni', 'Alumni']].map(f => '<a href="#" data-f="' + f[0] + '"' + (f[0] === filt ? ' style="font-weight:800"' : '') + '>' + f[1] + '</a>').join(' · ') + ' &nbsp;(' + shown.length + ' of ' + items.length + ')</p>' +
+        '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Name</th><th>Roll</th><th>Programme</th><th>Batch</th><th>Status</th><th>Passed out</th><th>Outcome</th><th>Company / institution</th><th>Role / course</th><th></th></tr></thead><tbody>' +
+        (shown.length ? shown.map(([x, i]) => '<tr data-i="' + i + '"><td><input data-k="name" value="' + esc(x.name) + '"></td><td><input data-k="roll" size="9" value="' + esc(x.roll) + '"></td>' +
+          '<td>' + sel('programme', [['bsms', 'BS-MS'], ['msc', 'M.Sc.'], ['mtech', 'M.Tech.']], x.programme) + '</td><td><input data-k="batch" size="5" value="' + esc(x.batch) + '"></td>' +
+          '<td>' + sel('status', [['current', 'Current'], ['alumni', 'Alumni']], x.status) + '</td><td><input data-k="passout" size="5" value="' + esc(x.passout) + '"></td>' +
+          '<td>' + sel('outcome', [['', '—'], ['placed', 'Placed'], ['higher', 'Higher studies'], ['other', 'Other']], x.outcome) + '</td>' +
+          '<td><input data-k="org" value="' + esc(x.org) + '"></td><td><input data-k="role" value="' + esc(x.role) + '"></td>' +
+          '<td class="actions"><button class="btn btn-danger btn-sm" data-m="del">Delete</button></td></tr>').join('') : '<tr><td colspan="10"><small>No students yet.</small></td></tr>') + '</tbody></table></div>';
+      const sync = () => $$('tbody tr[data-i]').forEach(tr => { const it = items[+tr.dataset.i]; $$('[data-k]', tr).forEach(el => { it[el.dataset.k] = el.value; }); });
+      const save = async () => { sync(); const r = await api('PUT', '/admin/students', {items}); const d2 = await api('GET', '/admin/students'); items = d2.items; return r; };
+      $$('[data-f]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); sync(); filt = a.dataset.f; draw(); }));
+      $$('[data-m="del"]').forEach(b => b.addEventListener('click', () => { if (!confirm('Delete this student?')) return; sync(); items.splice(+b.closest('tr').dataset.i, 1); draw(); }));
+      $('#sAdd').addEventListener('submit', e => { e.preventDefault(); sync(); const f = e.target;
+        items.push({name: f.name.value, roll: f.roll.value, programme: f.programme.value, batch: f.batch.value, status: 'current'}); draw(); });
+      $('#sSave').addEventListener('click', async () => { try { await save(); toast('Saved.'); draw(); } catch (err) { toast(err.message, true); } });
+      $('#sFile').addEventListener('change', async e => {
+        const file = e.target.files[0]; if (!file) return;
+        try { const r = await api('POST', '/admin/students/import', JSON.parse(await file.text())); toast(r.added + ' added, ' + r.updated + ' updated.'); VIEWS.students(); }
+        catch (err) { toast(err.message || 'That file is not valid JSON.', true); }
+      });
     };
     draw();
   };

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Firstname Lastname",
+    "type": "faculty",
+    "designation": "Professor",
+    "status": "former",
+    "year": "2020",
+    "email": "name@example.com",
+    "topic": "Research interest",
+    "areas": [
+      "analysis"
+    ]
+  }
+]

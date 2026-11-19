@@ -1,0 +1,13 @@
+[
+  {
+    "name": "Firstname Lastname",
+    "type": "scholar",
+    "designation": "Ph.D. Scholar",
+    "status": "alumni",
+    "supervisor": "ratna-dutta",
+    "joined": "2018",
+    "year": "2023",
+    "now": "Postdoc at University name",
+    "topic": "Thesis topic"
+  }
+]

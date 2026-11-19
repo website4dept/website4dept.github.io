@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Firstname Lastname",
+    "type": "postdoc",
+    "designation": "Post-Doctoral Fellow",
+    "status": "current",
+    "supervisor": "ratna-dutta",
+    "email": "name@example.com",
+    "topic": "Research topic"
+  }
+]

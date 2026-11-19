@@ -1217,16 +1217,44 @@ h1,h2,h3,h4{font-weight:700}
 /* Students page: photo-first overview and section photo strips */
 .student-cards{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
 .student-card{padding:0;min-height:0;overflow:hidden}
-.student-photo{height:150px;background:#e8dfe0;overflow:hidden}
+.student-photo{height:150px;background:linear-gradient(135deg,#4a121c 0%,#6f1d2a 55%,#8a2a39 100%);overflow:hidden;position:relative}
+.student-photo.is-empty::after{content:attr(data-sym);position:absolute;right:16px;bottom:-14px;font:700 92px/1 "Source Serif 4",Georgia,serif;color:rgba(255,255,255,.13)}
 .student-photo img{width:100%;height:100%;object-fit:cover;display:block}
 .student-card-body{padding:20px 22px 22px}
 .student-card-body h3{margin-bottom:8px}
 .student-strip{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:32px}
-.student-strip figure{margin:0;height:130px;background:#e8dfe0;overflow:hidden}
+.student-strip figure{margin:0;height:130px;background:linear-gradient(135deg,#4a121c,#6f1d2a);overflow:hidden}
 .student-strip figure.big{grid-row:span 1;height:130px}
 .student-strip img{width:100%;height:100%;object-fit:cover;display:block}
 .student-strip.is-placeholder{grid-template-columns:1fr}
-.student-strip figure.is-empty{display:flex;align-items:center;justify-content:center;padding:0 16px;text-align:center;color:var(--maroon);font-size:13px}
+.student-strip figure.is-empty{display:flex;align-items:center;justify-content:center;padding:0 16px;text-align:center;color:rgba(255,255,255,.85);font-size:13px}
 .student-strip.is-placeholder figure{height:90px}
 .student-strip.is-placeholder figcaption{max-width:60ch}
 @media(max-width:700px){.student-strip{grid-template-columns:1fr 1fr}.student-strip figure.big{grid-column:span 2}}
+
+/* Students: programme tabs, batches, alumni */
+.stu-tabs{margin-bottom:26px}
+.stu-tabs .pill{cursor:pointer;font-family:inherit}
+.stu-tabs .pill.is-current{background:var(--maroon);border-color:var(--maroon);color:#fff}
+.stu-head{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px}
+.stu-sub{font-size:14px;color:var(--muted,#5b6b73);margin:6px 0 0}
+.stu-sub a{color:var(--maroon);font-weight:700}
+.stu-res{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted,#5b6b73)}
+.stu-res span{border:1px dashed #cfd8dc;padding:6px 10px}
+.stu-h3{font:700 20px "Source Serif 4",Georgia,serif;margin:34px 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line);position:relative}
+.stu-h3::after{content:"";position:absolute;left:0;bottom:-1px;width:56px;height:2px;background:var(--gold)}
+.stu-batches,.stu-alumni{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+.stu-batch{background:#fff;border:1px solid var(--line);border-top:3px solid var(--maroon);padding:16px 18px}
+.stu-batch h4{font:700 16px "Source Serif 4",Georgia,serif;margin:0 0 10px;color:var(--ink,#1c2b33)}
+.stu-list{list-style:none;margin:0;padding:0}
+.stu-list li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #eef2f3;font-size:14px}
+.stu-list li:last-child{border-bottom:0}
+.stu-roll{color:var(--muted,#5b6b73);font-size:12px;white-space:nowrap}
+.stu-alum li{flex-direction:column;gap:2px}
+.stu-out{font-size:12.5px;color:var(--muted,#5b6b73)}
+.stu-out.placed{color:#245668;font-weight:600}.stu-out.higher{color:var(--maroon);font-weight:600}
+.stu-stats{display:flex;gap:18px;flex-wrap:wrap;margin:30px 0 18px}
+.stu-stats div{flex:1 1 150px;border:1px solid var(--line);border-top:3px solid var(--maroon);background:#fff;padding:16px 18px}
+.stu-stats b{display:block;font:700 34px "Source Serif 4",Georgia,serif;color:var(--maroon)}
+.stu-stats span{font-size:13px;color:var(--muted,#5b6b73)}
+.stu-recent{max-width:760px;margin-bottom:10px}

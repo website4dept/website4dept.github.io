@@ -1,0 +1,167 @@
+{
+  "id": "",
+  "name": "",
+  "type": "faculty",
+  "designation": "professor | associate-professor | assistant-professor",
+  "grade": "",
+  "head": false,
+  "status": "current",
+  "photo": "",
+  "updated": "",
+  "email": "",
+  "phone": "",
+  "office": "",
+  "office_hours": "",
+  "website": "",
+  "cv": "",
+  "profile": "",
+  "links": {
+    "scholar": "",
+    "orcid": "",
+    "scopus": "",
+    "mathscinet": "",
+    "dblp": "",
+    "researchgate": "",
+    "arxiv": "",
+    "linkedin": ""
+  },
+  "responsibilities": [],
+  "areas": [],
+  "bio": "",
+  "interests": "",
+  "education": [
+    {
+      "degree": "",
+      "subject": "",
+      "institution": "",
+      "year": "",
+      "thesis": ""
+    }
+  ],
+  "experience": [
+    {
+      "position": "",
+      "organisation": "",
+      "from": "",
+      "to": ""
+    }
+  ],
+  "awards": [
+    {
+      "title": "",
+      "body": "",
+      "year": ""
+    }
+  ],
+  "memberships": [
+    {
+      "name": "",
+      "role": ""
+    }
+  ],
+  "publications": [
+    {
+      "type": "journal | conference | book | chapter | preprint",
+      "authors": "",
+      "title": "",
+      "venue": "",
+      "volume": "",
+      "pages": "",
+      "year": "",
+      "doi": "",
+      "url": ""
+    }
+  ],
+  "projects": [
+    {
+      "title": "",
+      "agency": "",
+      "role": "PI | Co-PI",
+      "from": "",
+      "to": "",
+      "amount": "",
+      "status": "ongoing | completed"
+    }
+  ],
+  "students": [
+    {
+      "name": "",
+      "level": "PhD | Postdoc | M.Sc. | M.Tech. | BS-MS",
+      "topic": "",
+      "year": "",
+      "status": "current | graduated",
+      "now": ""
+    }
+  ],
+  "teaching": [
+    {
+      "code": "",
+      "title": "",
+      "level": "",
+      "semester": ""
+    }
+  ],
+  "admin": [
+    {
+      "role": "",
+      "from": "",
+      "to": ""
+    }
+  ],
+  "talks": [
+    {
+      "title": "",
+      "event": "",
+      "place": "",
+      "date": ""
+    }
+  ],
+  "editorial": [
+    {
+      "role": "",
+      "journal": ""
+    }
+  ],
+  "events": [
+    {
+      "title": "",
+      "role": "",
+      "date": ""
+    }
+  ],
+  "consultancy": [
+    {
+      "title": "",
+      "client": "",
+      "from": "",
+      "to": ""
+    }
+  ],
+  "patents": [
+    {
+      "title": "",
+      "number": "",
+      "status": "",
+      "year": ""
+    }
+  ],
+  "collaborators": [
+    {
+      "name": "",
+      "institution": ""
+    }
+  ],
+  "materials": [
+    {
+      "title": "",
+      "url": ""
+    }
+  ],
+  "visits": [
+    {
+      "institution": "",
+      "place": "",
+      "date": ""
+    }
+  ]
+}

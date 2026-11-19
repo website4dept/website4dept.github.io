@@ -1,0 +1,20 @@
+{
+  "programme": "msc",
+  "status": "alumni",
+  "students": [
+    {
+      "name": "Alumnus One",
+      "passout": 2025,
+      "outcome": "placed",
+      "org": "Company name",
+      "role": "Data Scientist"
+    },
+    {
+      "name": "Alumna Two",
+      "passout": 2024,
+      "outcome": "higher",
+      "org": "University name",
+      "role": "Ph.D. in Mathematics"
+    }
+  ]
+}

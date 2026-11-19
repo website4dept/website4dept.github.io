@@ -1,0 +1,11 @@
+{
+  "programme": "msc",
+  "batch": 2025,
+  "students": [
+    "Student One",
+    {
+      "name": "Student Two",
+      "roll": "25MA10002"
+    }
+  ]
+}

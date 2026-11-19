@@ -1,0 +1,52 @@
+[
+  {
+    "id": "birendra-nath-mandi",
+    "name": "Birendra Nath Mandi",
+    "type": "staff",
+    "designation": "Senior Superintendent",
+    "status": "current",
+    "photo": "",
+    "email": "",
+    "phone": ""
+  },
+  {
+    "id": "akshay-murmu",
+    "name": "Akshay Murmu",
+    "type": "staff",
+    "designation": "Senior Technical Superintendent",
+    "status": "current",
+    "photo": "",
+    "email": "",
+    "phone": ""
+  },
+  {
+    "id": "anirban-chakraborty",
+    "name": "Anirban Chakraborty",
+    "type": "staff",
+    "designation": "Junior Technician / Junior Laboratory Assistant",
+    "status": "current",
+    "photo": "",
+    "email": "",
+    "phone": ""
+  },
+  {
+    "id": "magdali-barla",
+    "name": "Magdali Barla",
+    "type": "staff",
+    "designation": "Junior Assistant",
+    "status": "current",
+    "photo": "",
+    "email": "",
+    "phone": ""
+  },
+  {
+    "id": "ram-bahadur-doot-maurati",
+    "name": "Ram Bahadur Doot Maurati",
+    "type": "staff",
+    "designation": "Senior Multi Tasking Staff Grade-II",
+    "status": "current",
+    "photo": "",
+    "email": "",
+    "phone": ""
+  }
+]

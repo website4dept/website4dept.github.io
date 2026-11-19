@@ -1,0 +1,13 @@
+[
+  {
+    "name": "Firstname Lastname",
+    "type": "adjunct",
+    "designation": "Adjunct Faculty",
+    "status": "current",
+    "email": "name@example.com",
+    "topic": "Research interest",
+    "areas": [
+      "algebra"
+    ]
+  }
+]

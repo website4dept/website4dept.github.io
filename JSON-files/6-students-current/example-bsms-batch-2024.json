@@ -1,0 +1,8 @@
+{
+  "programme": "bsms",
+  "batch": 2024,
+  "students": [
+    "Student One",
+    { "name": "Student Two", "roll": "24MA10002" }
+  ]
+}

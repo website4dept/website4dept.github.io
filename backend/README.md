@@ -76,7 +76,7 @@ Gmail allows roughly 500 e-mails a day – fine for testing and small groups.
 | See who changed what | Admin → **Activity log**. |
 
 ### Adding many scholars, alumni or students at once (JSON)
-Templates: `docs/import-template-scholars.json` and `docs/import-template-students.json`.
+Every JSON file is explained in `JSON-files/README.md` (people, students, mailing lists). Templates: `JSON-files/2-research-scholars/example-research-scholars.json` and `JSON-files/7-mailing-lists/example-mailing-list-contacts.json`.
 Admin → **Import data (JSON)** → choose the file → Import (or `python server.py import file.json`).
 * Profiles (`"type": "scholar"` / `"postdoc"` / …) are created, or merged into the existing profile with the same `id`.
 * Graduated scholars: `"status": "alumni"` + `"year"` (completed) + optional `"now"` → listed under Alumni.
