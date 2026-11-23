@@ -101,7 +101,7 @@
         '<div class="rb-status is-warn">The department’s list of e-mail addresses has not been loaded yet, ' +
         'so the form cannot accept requests. Please contact the department office.</div>') +
 
-      '<section class="card rb-pick">' +
+      '<section class="rb-pick">' +
         '<h3>1 &nbsp;Choose a room and a time</h3>' +
         '<div class="rb-roomrow">' +
           '<label><span class="lbl">Room</span><select id="rbRoom">' +
@@ -306,7 +306,7 @@
   function drawCode(r){
     say('');
     wrap.innerHTML =
-      '<div class="card rb-code"><h3>Check your e-mail</h3>' +
+      '<div class="rb-code"><h3>Check your e-mail</h3>' +
       '<p>We have sent a six-digit code to <strong>' + esc(r.sent_to) + '</strong>. ' +
       'Type it in below to send the request. The code is valid for ' + r.minutes + ' minutes.</p>' +
       (r.advisor ? '<p class="hint">' + esc(r.advisor) + ' will be copied in on the e-mails' +
@@ -339,7 +339,7 @@
     say('');
     const who = d.approved ? '' : 'It is now with <strong>' + esc(d.waiting_with) + '</strong>.';
     wrap.innerHTML =
-      '<div class="card rb-done">' +
+      '<div class="rb-done">' +
         '<h3>' + (d.approved ? 'Your room is booked' : 'Request sent') + '</h3>' +
         '<p class="rb-ref">Reference <strong>' + esc(d.ref) + '</strong></p>' +
         '<p>' + (d.approved
@@ -369,14 +369,14 @@
     }
     const when = esc(info.pretty) + ', ' + esc(info.start) + '–' + esc(info.end);
     if (!info.can_release){
-      wrap.innerHTML = '<div class="card"><h3>Nothing to give back</h3>' +
+      wrap.innerHTML = '<div class="rb-done"><h3>Nothing to give back</h3>' +
         '<p>Booking <strong>' + esc(info.ref) + '</strong> (' + esc(info.room) + ', ' + when +
         ') is no longer a confirmed future booking.</p>' +
         '<div class="rb-actions"><a class="btn btn-maroon" href="room-booking.html">Book a room</a></div></div>';
       return;
     }
     wrap.innerHTML =
-      '<div class="card"><h3>Give this room back?</h3>' +
+      '<div class="rb-done"><h3>Give this room back?</h3>' +
       '<p>If you no longer need it, releasing the slot lets somebody else use it.</p>' +
       '<ul class="rb-slots"><li><strong>' + esc(info.room) + '</strong> — ' + when + '</li></ul>' +
       '<p>' + esc(info.title) + ' <small>(' + esc(info.ref) + ')</small></p>' +
@@ -386,7 +386,7 @@
       ev.target.disabled = true; ev.target.textContent = 'Releasing…';
       try {
         const r = await api('POST', '/release', {t: token});
-        wrap.innerHTML = '<div class="card rb-done"><h3>Room given back</h3>' +
+        wrap.innerHTML = '<div class="rb-done"><h3>Room given back</h3>' +
           '<p><strong>' + esc(r.room) + '</strong>, ' + esc(r.pretty) + ', ' + esc(r.start) + '–' + esc(r.end) +
           ' is free again. The department office has been told.</p>' +
           '<div class="rb-actions"><a class="btn btn-maroon" href="room-booking.html">Book another room</a>' +

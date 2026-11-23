@@ -197,3 +197,8 @@ tr.bk-conflict td{background:#fdf3f3}
   .td-list li{grid-template-columns:110px minmax(0,2fr) minmax(0,1fr)}
   body{background:#fff}
 }
+
+/* The room booking page uses this same shell, but needs a wider card */
+.auth-card-wide{width:min(1040px,100%);padding:36px 40px 30px}
+.auth-lead{margin:-10px 0 26px;color:var(--muted);font-size:15px;line-height:1.65;max-width:70ch}
+@media(max-width:700px){.auth-card-wide{padding:26px 20px 22px}}

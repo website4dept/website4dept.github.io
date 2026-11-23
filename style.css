@@ -1281,8 +1281,7 @@ h1,h2,h3,h4{font-weight:700}
 /* =====================================================================
    Book a room — the public booking page (room-booking.html)
    ===================================================================== */
-.rb-layout{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:32px;align-items:start}
-.rb-main .pform{background:#fff;border:1px solid var(--line,#dfe5e8);padding:26px 28px}
+/* (the booking page now sits in the portal card; no two-column page layout) */
 .rb-form h3{font-family:"Source Serif 4",Georgia,serif;font-size:19px;margin:4px 0 16px;
   padding-bottom:10px;border-bottom:2px solid var(--gold,#c9a227)}
 .rb-form h3 + .rb-grid{margin-bottom:26px}
@@ -1321,8 +1320,9 @@ h1,h2,h3,h4{font-weight:700}
 @media(max-width:600px){.rb-grid{grid-template-columns:1fr}.rb-main .pform{padding:20px 18px}}
 
 /* ---- Book a room: the availability calendar ---- */
-.rb-pick{margin-bottom:26px}
-.rb-pick h3,.rb-form h3{font-family:"Source Serif 4",Georgia,serif;font-size:19px;margin:4px 0 16px;
+.rb-pick{margin-bottom:8px}
+.rb-pick > h3:first-child{margin-top:0}
+.rb-pick h3,.rb-form h3{margin-top:28px;font-family:"Source Serif 4",Georgia,serif;font-size:19px;margin:4px 0 16px;
   padding-bottom:10px;border-bottom:2px solid var(--gold,#c9a227)}
 .rb-roomrow{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:16px 20px;align-items:start;margin-bottom:20px}
 .rb-roomrow label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700;color:#36474f}

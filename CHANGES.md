@@ -4,6 +4,42 @@ Newest first. Each entry says what was asked for, which files changed, and why.
 
 ---
 
+## 23 November 2026 — Room Booking given the portal look
+
+Requested: clicking Room Booking should open an interface like the portal login page.
+
+The page is rebuilt on the portal shell — slim white header with the crest and
+"← Back to website", a light grey background, one centred white card with the gold
+top border, and the dark footer bar. The site's main navigation and the big maroon
+hero are gone from this page: it is a task, like logging in, not a page to browse.
+
+Everything inside is unchanged — the calendar, the three numbered steps, the code
+step, the confirmation and the release page all now sit inside that one card.
+
+| File | Change |
+|---|---|
+| `room-booking.html` | Rebuilt on the portal shell; loads `portal/portal.css` as well as `style.css`. The sidebar's three boxes folded into one short "How it works / Who approves it" note at the foot of the card |
+| `portal/portal.css` | `.auth-card-wide` (1040px) and `.auth-lead`, so the same card can hold a calendar and a form |
+| `room-booking.js` | Inner panels no longer draw their own card frames, which would have nested inside the page card |
+| `style.css` | The old two-column page layout for this page removed |
+
+---
+
+## 23 November 2026 — Try it on your own computer
+
+| File | What it is |
+|---|---|
+| `RUN-ON-YOUR-PC.md` | Step-by-step: unzip, two commands, and what to click to see the whole flow |
+| `backend/try-it.py` | One command that builds a demo database: your address on the register, three portal logins, sample bookings so the calendar has colour |
+
+Tested from a clean unzip: `python3 try-it.py you@example.com`, `python3 server.py`,
+then a real two-step portal login and a real booking through the public form.
+
+Delete `try-it.py` before the system goes live on the CIC server — it only exists
+to make a demo database.
+
+---
+
 ## 23 November 2026 — Availability calendar on the booking page
 
 Requested: when someone opens Room Booking they should see the available dates and
