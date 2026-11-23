@@ -4,6 +4,32 @@ Newest first. Each entry says what was asked for, which files changed, and why.
 
 ---
 
+## 23 November 2026 — The Head is e-mailed only when the office forwards
+
+Requested: the HoD should get the mail only when the office forwards a request to
+him. This reverses the earlier "seminar halls go straight to the HoD" decision.
+
+**Before:** a seminar hall request e-mailed the Head the moment it was made; the
+office never touched it first.
+**Now:** every request — from the website or the portal — lands with the department
+office. They forward a hall to the Head, which is the only thing that e-mails him,
+or confirm a classroom themselves. His standing approval is applied at the moment
+of forwarding, so a routine request he has already blessed is confirmed then and
+there without troubling him.
+
+| File | Change |
+|---|---|
+| `backend/bookings.py` | `route_new_booking()` now always returns the request to the office. `mail_forwarded()` is called from one place only, the office's Forward action. First-e-mail and confirmation wording say the office |
+| `portal/bookings.js` | The office's **Forward to HoD** button restored for halls; office and Head screen text updated |
+| `room-booking.html`, `room-booking.js` | The page says every request goes to the office first |
+| `backend/test_bookings.py`, `test_public.py`, `test_extras.py` | Expectations follow the flow; two new checks assert the Head gets no e-mail and sees nothing until the office forwards |
+
+**Also fixed:** `try-it.py` attributed its four sample bookings to your own address,
+which used up the five-requests-an-hour limit before you could make your first
+booking. They now come from a separate demo address.
+
+---
+
 ## 23 November 2026 — Room Booking given the portal look
 
 Requested: clicking Room Booking should open an interface like the portal login page.

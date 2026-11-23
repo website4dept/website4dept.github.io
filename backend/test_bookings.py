@@ -39,6 +39,21 @@ def make_user(email, role, person_id=None):
     return Client(sid, csrf)
 
 
+
+def last_office_mails(n=60):
+    import email, email.policy
+    out = []
+    if not os.path.isdir("data/outbox"):
+        return out
+    for f in sorted(os.listdir("data/outbox"))[-n:]:
+        with open("data/outbox/" + f, "rb") as fh:
+            m = email.message_from_binary_file(fh, policy=email.policy.default)
+        try:
+            out.append((m["Subject"] or "") + "\n" + m.get_body(preferencelist=("plain",)).get_content())
+        except Exception:
+            out.append(m["Subject"] or "")
+    return out
+
 def booking_status(bid):
     return server.q1("SELECT status FROM bookings WHERE id=?", (bid,))["status"]
 def is_auto(bid):
@@ -75,7 +90,7 @@ s, d = prof("POST", "/api/bookings", req)
 check("request accepted", s == 200 and d.get("ok"), (s, d))
 B1 = d["booking"]["id"]; REF1 = d["booking"]["ref"]
 check("reference number issued", REF1.startswith("MA-B-"), REF1)
-check("a hall goes straight to the Head", d["booking"]["status"] == "forwarded", d["booking"]["status"])
+check("every request starts with the office", d["booking"]["status"] == "pending", d["booking"]["status"])
 
 s, d = staffp("POST", "/api/bookings", dict(req, start="15:00", end="16:00"))
 check("staff may book", s == 200, (s, d))
@@ -106,20 +121,33 @@ check("hall is marked as needing the HoD", all(x["needs_hod"] for x in d["queue"
 s, d = prof("GET", "/api/bookings/queue"); check("faculty cannot see the queue", s == 403, s)
 s, d = prof("GET", "/api/bookings/hod");   check("faculty cannot see approvals", s == 403, s)
 
-print("\n--- the HoD decides on halls ---")
+print("\n--- the office forwards, then the HoD decides ---")
+s, d = hod("GET", "/api/bookings/hod")
+check("the Head is told nothing until the office forwards", s == 200 and len(d["waiting"]) == 0,
+      (s, len(d.get("waiting", []))))
+mails_before = len([m for m in last_office_mails() if "for your approval" in m])
+check("and no approval e-mail has been sent to him", mails_before == 0, mails_before)
+
 s, d = office("POST", "/api/bookings/%d/office" % B1, {"action": "confirm"})
 check("office cannot confirm a hall itself", s == 400, (s, d.get("error", "")[:50]))
 s, d = office("POST", "/api/bookings/%d/office" % B1, {"action": "return", "note": "check the date"})
-check("but the office can send a hall request back", s == 200 and d["status"] == "returned", (s, d))
+check("the office can send a request back", s == 200 and d["status"] == "returned", (s, d))
 s, d = prof("PUT", "/api/bookings/%d" % B1, dict(req, room_id=HALL))
-check("and the asker can resend it", s == 200, (s, d.get("error")))
+check("the asker can correct and resend it", s == 200, (s, d.get("error")))
+check("which puts it back with the office, not the Head", d.get("status") == "pending", d.get("status"))
 B1 = d["booking"]["id"] if s == 200 else B1
+
+s, d = office("POST", "/api/bookings/%d/office" % B1, {"action": "forward"})
+check("the office forwards it", s == 200 and d["status"] == "forwarded", (s, d))
+check("now the Head gets his e-mail",
+      len([m for m in last_office_mails() if "for your approval" in m]) >= 1, "none sent")
 s, d = hod("GET", "/api/bookings/hod")
-check("HoD sees hall requests waiting", s == 200 and len(d["waiting"]) >= 1, (s, len(d.get("waiting", []))))
+check("and it appears in his list", s == 200 and len(d["waiting"]) >= 1, (s, len(d.get("waiting", []))))
 s, d = hod("POST", "/api/bookings/%d/decide" % B1, {"action": "approve", "note": "Approved."})
 check("HoD approves", s == 200 and d["status"] == "approved", (s, d))
 
 print("\n--- the slot is now really held ---")
+office("POST", "/api/bookings/%d/office" % B2, {"action": "forward"})
 s2, d2 = hod("POST", "/api/bookings/%d/decide" % B2, {"action": "approve"})
 check("a competing request cannot be approved into the taken slot", s2 == 409, (s2, d2.get("error")))
 s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DAY, "start": "10:30", "end": "11:00",
@@ -143,21 +171,28 @@ server.q("UPDATE rooms SET needs_hod=1, auto_ok=1 WHERE id=?", (HALL,))
 s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DAY, "start": "14:00", "end": "15:00",
                                       "title": "Routine lab meeting", "attendees": 20})
 B5 = d["booking"]["id"]
-check("routine hall request approved on arrival", d["booking"]["status"] == "approved", d["booking"]["status"])
-check("and marked as automatic", booking_status(B5) == "approved" and is_auto(B5), (booking_status(B5), is_auto(B5)))
+check("a routine hall request waits with the office first", d["booking"]["status"] == "pending", d["booking"]["status"])
+s, d = office("POST", "/api/bookings/%d/office" % B5, {"action": "forward"})
+check("forwarding it approves it at once under standing approval",
+      s == 200 and d["status"] == "approved" and d.get("auto"), (s, d))
+check("and it is marked as automatic", booking_status(B5) == "approved" and is_auto(B5),
+      (booking_status(B5), is_auto(B5)))
 
 s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DAY, "start": "15:30", "end": "19:30",
                                       "title": "All-evening workshop", "attendees": 80, "outside": True})
 B6 = d["booking"]["id"]
-check("an outside booking still goes to the HoD", d["booking"]["status"] == "forwarded", d["booking"]["status"])
-check("and the reason is recorded in its history", "outside" in log_text(B6), log_text(B6))
+s, d = office("POST", "/api/bookings/%d/office" % B6, {"action": "forward"})
+check("an outside booking still goes to the HoD", s == 200 and d["status"] == "forwarded", (s, d))
+check("and the reason standing approval did not cover it is recorded",
+      "outside" in (d.get("why") or "") or "outside" in log_text(B6), (d.get("why"), log_text(B6)))
 
 bookings.save_cfg({"auto_until": DAY})
 far = (server.now() + server.timedelta(days=30)).strftime("%Y-%m-%d")
 s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": far, "start": "14:00", "end": "15:00",
                                       "title": "Later talk"})
 B7 = d["booking"]["id"]
-check("auto-approve stops after the end date", d["booking"]["status"] == "forwarded", d["booking"]["status"])
+s, d = office("POST", "/api/bookings/%d/office" % B7, {"action": "forward"})
+check("auto-approve stops after the end date", s == 200 and d["status"] == "forwarded", (s, d))
 bookings.save_cfg({"auto_until": ""})
 
 print("\n--- returning a request for correction ---")
@@ -174,7 +209,11 @@ s, d = prof("PUT", "/api/bookings/%d" % B8, {"room_id": ROOM, "date": DAY, "star
 check("someone else cannot edit it", s == 403, s)
 
 print("\n--- bulk approval and taking a booking back ---")
+for x in office("GET", "/api/bookings/queue")[1]["queue"]:      # office clears its desk
+    if x["status"] in ("pending", "returned"):
+        office("POST", "/api/bookings/%d/office" % x["id"], {"action": "forward"})
 ids = [x["id"] for x in hod("GET", "/api/bookings/hod")[1]["waiting"]]
+check("the Head now has the forwarded ones", len(ids) >= 1, ids)
 s, d = hod("POST", "/api/bookings/decide-many", {"ids": ids, "action": "approve", "note": "Cleared together."})
 check("HoD approves several at once", s == 200 and d["done"] >= 1, (s, d))
 check("every one is accounted for", d["done"] + len(d["failed"]) == len(ids), (d["done"], d["failed"], ids))

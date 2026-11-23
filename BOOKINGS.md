@@ -44,7 +44,7 @@ Everything else keeps working; the tables simply sit unused.
 
 ## 2. The flow
 
-There are two ways in. Both end in the same queue.
+There are two ways in. Both end in the same place: the department office.
 
 ```
   the booking form on the website            the portal, for people already signed in
@@ -54,24 +54,26 @@ There are two ways in. Both end in the same queue.
           │ six-digit code e-mailed and typed back     │
           └───────────────────┬────────────────────────┘
                               ▼
-            ┌─────────────────────────────────┐
-            │   does the room need the Head?  │
-            └───────────┬─────────────┬───────┘
-                   NO   │             │  YES
-                        ▼             ▼
-              the office confirms   straight to the Head
-              (classrooms)          (seminar halls)
-                        │             │
-                        │             ├── standing approval covers it
-                        │             │   and it is routine ──► approved at once
-                        │             └── otherwise ──► the Head approves or rejects
-                        ▼             ▼
-                           approved / rejected
+                   THE DEPARTMENT OFFICE                      status: pending
+                   checks every request, then
+                      ├── Return  ──► back to the asker to correct
+                      ├── Reject  ──► refused, with a reason
+                      ├── Confirm ──► approved   (rooms that do not need the Head)
+                      └── Forward ──► the Head of the Department
+                                        │
+                                        ├── standing approval covers it
+                                        │   and it is routine ──► approved at once
+                                        └── otherwise ──► he approves or rejects
 ```
 
-The office sees **every** request, whichever way it came and whoever has it. For a
-hall they no longer have to forward it by hand, but they can still send one back
-for correction or refuse it before the Head gets to it.
+**The Head is e-mailed only when the office forwards a request.** Nothing reaches
+him, and no approval e-mail is sent, while a request is still sitting with the
+office. In the code there is a single call to `mail_forwarded()`, inside
+`api_office()`, so this cannot happen by another route.
+
+His standing approval is applied at that same moment: if he has ticked the room and
+the request is routine, forwarding it confirms it immediately and he is not
+troubled at all.
 
 ### The register — who is allowed to book
 
@@ -101,8 +103,8 @@ of requests per address per hour are capped.
 |---|---|---|
 | anyone on the register, not signed in | the website form | Ask for a room (with a code), and read the e-mails |
 | `member` (faculty, scholars, postdocs, staff) | Book a room | Ask for a room, follow their own requests, cancel them |
-| `office` | Book a room, Booking requests | The queue, confirm classrooms, return or reject anything, withdraw a confirmed booking, see every booking. One shared account: two people signed in at a time, a third signs the oldest out |
-| `hod` | Book a room, Approvals | Approve or reject hall requests, in bulk if they like; set standing approval; withdraw a booking |
+| `office` | Book a room, Booking requests | Every request lands here. Forward a hall to the Head, confirm a classroom, return or reject anything, withdraw a confirmed booking. One shared account: two people signed in at a time, a third signs the oldest out |
+| `hod` | Book a room, Approvals | Approve or reject what the office has forwarded, in bulk if they like; set standing approval; withdraw a booking |
 | `admin` | all of the above, plus Rooms & halls | Everything, and add or edit rooms |
 
 A faculty member who is also the Head gets the `hod` role — they keep their own
@@ -151,7 +153,8 @@ for all three people.
 | When | Subject | Says |
 |---|---|---|
 | the form is filled in | Your booking code: 123456 | the six-digit code (to the requester only) |
-| the request is made | Room booking MA-B-2026-0001 — … | received, waiting for approval, and with whom |
+| the request is made | Room booking MA-B-2026-0001 — … | received, waiting with the department office |
+| the office forwards it | Room booking for your approval — … | **to the Head only**, and only at this point |
 | approved | *(same subject, same thread)* | CONFIRMED, with the full details |
 | rejected | *(same thread)* | NOT APPROVED, with the reason |
 | sent back | *(same thread)* | SENT BACK, with what to correct |
@@ -200,16 +203,16 @@ In console mail mode the invitation link for each is printed in the terminal.
 From the `backend` folder:
 
 ```bash
-python3 test_bookings.py     # 69 checks: the portal flow, permissions, clashes,
+python3 test_bookings.py     # 76 checks: the portal flow, permissions, clashes,
                             # routing, standing approval, bulk approval, CSRF
-python3 test_public.py       # 58 checks: the register, the six-digit code, threading,
+python3 test_public.py       # 59 checks: the register, the six-digit code, threading,
                             # CC, what the public calendar may show, rate limits,
                             # and the two-at-a-time office account
 python3 test_extras.py       # 46 checks: the release link, no-shows, the Notice Board
                             # tick, the Today sheet and the availability calendar
 ```
 
-173 checks in all. They run against the real server code through the real
+181 checks in all. They run against the real server code through the real
 addresses, not mocks.
 
 ---

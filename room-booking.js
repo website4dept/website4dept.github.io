@@ -169,7 +169,7 @@
       const r = rooms.find(x => x.id === SEL.room) || {};
       $('#rbRoomNote').innerHTML = [r.location ? esc(r.location) : '', r.facilities ? esc(r.facilities) : '',
         r.custodian ? 'Key: ' + esc(r.custodian) : '',
-        r.needs_hod ? '<strong>Approved by the Head of the Department</strong>' : 'Confirmed by the department office'
+        r.needs_hod ? '<strong>Office, then the Head of the Department</strong>' : 'Confirmed by the department office'
       ].filter(Boolean).join(' · ');
     }
     roomNote();

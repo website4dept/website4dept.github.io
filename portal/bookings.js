@@ -202,8 +202,11 @@
         (b.conflict ? '<br><small class="bk-warn">clashes with a confirmed booking</small>' : '') +
         (b.competing.length ? '<br><small>also asked: ' + esc(b.competing.join('; ')) + '</small>' : '') + '</td>' +
       '<td class="actions">' +
-        (b.needs_hod ? '' : '<button class="btn btn-maroon btn-sm" data-act="confirm" data-id="' + b.id + '">Confirm</button>') +
-        (b.status === 'forwarded' ? '<small class="bk-withhod">with the Head</small>' : '') +
+        (b.status === 'forwarded'
+          ? '<small class="bk-withhod">with the Head</small>'
+          : (b.needs_hod
+              ? '<button class="btn btn-maroon btn-sm" data-act="forward" data-id="' + b.id + '">Forward to HoD</button>'
+              : '<button class="btn btn-maroon btn-sm" data-act="confirm" data-id="' + b.id + '">Confirm</button>')) +
         '<button class="btn btn-light btn-sm" data-act="return" data-id="' + b.id + '">Return</button>' +
         '<button class="btn btn-danger btn-sm" data-act="reject" data-id="' + b.id + '">Reject</button>' +
       '</td></tr>';
@@ -218,8 +221,9 @@
       ? '<div class="portal-alert">No e-mail addresses have been imported yet, so nobody can use the ' +
         'booking form on the website. Admin → Import data (JSON).</div>' : '';
     $('#view').innerHTML = head('Booking requests',
-        'Every room request appears here. Seminar halls go straight to the Head of the Department; ' +
-        'classrooms are yours to confirm. You can send any request back for correction or refuse it.') +
+        'Every room request lands here first. Check it, then forward a seminar hall to the Head ' +
+        'of the Department or confirm a classroom yourself. The Head is only e-mailed once you ' +
+        'forward. You can also send a request back for correction, or refuse it.') +
       empty + warn +
       '<div class="stat-grid">' +
         '<div class="stat-card"><strong>' + c.pending + '</strong><span>waiting for you</span></div>' +
@@ -368,9 +372,9 @@
         '<button class="btn btn-danger btn-sm" data-decide="reject" data-id="' + b.id + '">Reject</button></td></tr>';
 
     $('#view').innerHTML = head('Approvals',
-        'Room requests waiting for your decision. Seminar halls come to you as soon as they are ' +
-        'asked for; classrooms are confirmed by the department office and do not appear here. ' +
-        'Tick several and use “Approve selected” to clear them in one go.') +
+        'Room requests the department office has checked and forwarded to you. Classrooms are ' +
+        'confirmed by the office and do not appear here. Tick several and use “Approve selected” ' +
+        'to clear them in one go.') +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th><input type="checkbox" id="bkAll" aria-label="Select all"></th>' +
         '<th>Date &amp; time</th><th>Room</th><th>Purpose</th><th>Asked by</th><th></th></tr></thead><tbody>' +
         (d.waiting.length ? d.waiting.map(row).join('')

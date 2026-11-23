@@ -68,7 +68,10 @@ def book(a, b2, title, room=None):
     assert s == 200, d
     s, d = call("POST", "/api/bookings/open/confirm", {"ticket": d["ticket"], "code": latest_code()})
     assert s == 200, d
-    return server.q1("SELECT id FROM bookings WHERE ref=?", (d["ref"],))["id"], d["ref"]
+    bid = server.q1("SELECT id FROM bookings WHERE ref=?", (d["ref"],))["id"]
+    # every request starts with the office; forward it so the Head can decide
+    call("POST", "/api/bookings/%d/office" % bid, {"action": "forward"}, sid="so", csrf="cso")
+    return bid, d["ref"]
 
 B, REF = book("10:00", "12:00", "Invited seminar on elliptic curves")
 s, d = call("POST", "/api/bookings/%d/decide" % B, {"action": "approve"}, sid="sh", csrf="csh")

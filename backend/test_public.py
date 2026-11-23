@@ -107,8 +107,8 @@ check("a wrong code is refused", s == 401, (s, d.get("error")))
 s, d = call("POST", "/api/bookings/open/confirm", {"ticket": ticket, "code": code})
 check("the right code makes the request", s == 200 and d.get("ok"), (s, d))
 REF = d.get("ref")
-check("a hall goes straight to the Head", d.get("status") == "forwarded", d.get("status"))
-check("and the page says who has it", d.get("waiting_with") == "the Head of the Department", d.get("waiting_with"))
+check("every request starts with the office", d.get("status") == "pending", d.get("status"))
+check("and the page says who has it", d.get("waiting_with") == "the department office", d.get("waiting_with"))
 check("the ticket cannot be used twice", call("POST", "/api/bookings/open/confirm", {"ticket": ticket, "code": code})[0] == 400)
 
 print("\n--- the first e-mail ---")
@@ -126,8 +126,14 @@ flat = " ".join(one.split())
 check("it says the Head has it", "Head of the Department" in flat, flat[:300])
 
 # ---------------------------------------------------------------- the decision
-print("\n--- the Head approves: same conversation ---")
+print("\n--- the office forwards, the Head approves: same conversation ---")
 bid = server.q1("SELECT id FROM bookings WHERE ref=?", (REF,))["id"]
+s, d = call("POST", "/api/bookings/%d/decide" % bid, {"action": "approve"}, sid="sidhod", csrf="csidhod")
+check("the Head cannot act before the office forwards", s == 400, (s, d.get("error")))
+s, d = call("POST", "/api/bookings/%d/office" % bid, {"action": "forward"}, sid="sidoffice", csrf="csidoffice")
+check("the office forwards it", s == 200 and d["status"] == "forwarded", (s, d))
+check("only now is the Head e-mailed",
+      any("for your approval" in m and REF in m for m in last_mails(4)), "no approval mail")
 s, d = call("POST", "/api/bookings/%d/decide" % bid, {"action": "approve", "note": "Approved."},
             sid="sidhod", csrf="csidhod")
 check("approved", s == 200 and d["status"] == "approved", (s, d))
@@ -153,7 +159,7 @@ s, d = call("POST", "/api/bookings/open/start", dict(sform, advisor_id="ratna-du
 check("naming the advisor works", s == 200, (s, d.get("error")))
 check("the advisor will be copied in", d.get("advisor_notified") is True, d)
 s, d = call("POST", "/api/bookings/open/confirm", {"ticket": d["ticket"], "code": code_from_outbox()})
-check("classroom is for the office, not the Head", d.get("status") == "pending", d.get("status"))
+check("a classroom is the office's to confirm", d.get("status") == "pending", d.get("status"))
 SREF = d["ref"]
 
 print("\n--- what the public calendar shows ---")

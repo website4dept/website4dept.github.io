@@ -98,13 +98,17 @@ def main():
                (5, "15:00", "17:00", "Research scholars' colloquium"),
                (8, "14:00", "16:00", "Faculty meeting")]
     at = server.iso(server.now())
+    # These sample bookings are attributed to a separate demo address on purpose.
+    # If they used your address they would count against the "requests per hour"
+    # limit, and your own first booking would be refused.
+    seeded_by = "samples.demo@" + domain
     for n, a, b, title in samples:
         cur = server.q(
             "INSERT INTO bookings(ref,room_id,user_id,person_id,on_date,t_start,t_end,title,purpose,"
             "attendees,needs,outside,hide_name,status,created,updated,requester_name,requester_email,"
             "roll,phone,advisor_id,advisor_name,advisor_email,source)"
             " VALUES('',?,0,?,?,?,?,?,'',40,'',0,0,'approved',?,?,?,?,'','3222283654',?,?,?,'public')",
-            (hall["id"], FACULTY_ID, day(n), a, b, title, at, at, "Ratna Dutta", me,
+            (hall["id"], FACULTY_ID, day(n), a, b, title, at, at, "Ratna Dutta", seeded_by,
              FACULTY_ID, "Ratna Dutta", me))
         server.q("UPDATE bookings SET ref=? WHERE id=?",
                  ("MA-B-{}-{:04d}".format(day(n)[:4], cur.lastrowid), cur.lastrowid))

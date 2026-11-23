@@ -599,7 +599,8 @@ def mail_submitted(b, room):
     to, cc = thread_people(b)
     if not to:
         return
-    with_whom = "the Head of the Department" if room["needs_hod"] else "the department office"
+    with_whom = ("the department office, who will pass it to the Head of the Department"
+                 if room["needs_hod"] else "the department office")
     body = ("This room request has been received and is waiting for approval by {}.\n\n".format(with_whom)
             + details_text(b, room) +
             "\n\nNothing is booked yet. A second e-mail will follow in this same conversation\n"
@@ -728,29 +729,19 @@ def read_request_body(d):
 
 def route_new_booking(req, b, room, actor_email):
     """
-    Where a brand-new request goes.
-      a room marked "Head's approval"  -> straight to the Head
-                                          (or confirmed at once if his standing
-                                           approval covers it and it is routine)
-      any other room                   -> the department office confirms it
-    The office sees every request either way; for halls they no longer have to
-    forward it by hand.
+    Where a brand-new request goes: ALWAYS to the department office first.
+
+    The office checks it and then either confirms it themselves (a room that
+    does not need the Head's approval) or forwards it. The Head is only told
+    about a request once the office has forwarded it - see api_office(), which
+    is the one place mail_forwarded() is sent from.
+
+    The Head's standing approval is applied at that moment too, so a routine
+    request he has already blessed is confirmed as the office forwards it,
+    without troubling him at all.
     """
-    if not room["needs_hod"]:
-        log(b["id"], actor_email, "sent to the office")
-        return "pending", ""
-    ok, why = auto_check(b, room)
-    if ok:
-        hod = S.q1("SELECT * FROM users WHERE role='hod' AND active=1") or \
-              S.q1("SELECT * FROM users WHERE role='admin' AND active=1")
-        if hod:
-            approve(req, b, hod, "", auto=True)
-            return "approved", ""
-    at = S.iso(S.now())
-    S.q("UPDATE bookings SET status='forwarded',forwarded_at=?,updated=? WHERE id=?", (at, at, b["id"]))
-    log(b["id"], actor_email, "sent to the HoD", why)
-    mail_forwarded(booking_row(b["id"]), room, "the booking system")
-    return "forwarded", why
+    log(b["id"], actor_email, "sent to the department office")
+    return "pending", ""
 
 
 def mail_forwarded(b, room, by):
@@ -1263,7 +1254,7 @@ def api_open_confirm(req):
             "{} {} {}-{} (website)".format(room["name"], f["on_date"], f["t_start"], f["t_end"]), req.ip)
     mail_submitted(booking_row(b["id"]), room)
     status, _ = route_new_booking(req, booking_row(b["id"]), room, f["email"])
-    waiting_with = "the Head of the Department" if room["needs_hod"] else "the department office"
+    waiting_with = "the department office"
     return {"ok": True, "ref": b["ref"], "status": status, "waiting_with": waiting_with,
             "approved": status == "approved",
             "advisor": adv.get("name", ""), "advisor_notified": bool(adv.get("email"))}
