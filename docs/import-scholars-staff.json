@@ -25,7 +25,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "data-analysis"
+   "artificial-intelligence"
   ],
   "topic": "Application of Deep Learning",
   "supervisor": "adrijit-goswami",
@@ -277,8 +277,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "topology",
-   "scientific-computing"
+   "topology"
   ],
   "topic": "Computational Geometry and Topology",
   "supervisor": "bodhayan-roy",
@@ -315,7 +314,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "data-analysis"
+   "artificial-intelligence"
   ],
   "topic": "Machine Learning",
   "supervisor": "buddhananda-banerjee",
@@ -555,7 +554,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "data-analysis"
+   "artificial-intelligence"
   ],
   "topic": "Machine learning in healthcare",
   "supervisor": "debjani-chakraborty",
@@ -629,7 +628,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "data-analysis",
+   "artificial-intelligence",
    "statistical-inference"
   ],
   "topic": "Machine learning in medical decision making",
@@ -703,8 +702,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "algebra",
-   "scientific-computing"
+   "algebra"
   ],
   "topic": "Numerical linear algebra and applications",
   "supervisor": "geetanjali-panda",
@@ -722,8 +720,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "optimisation",
-   "scientific-computing"
+   "optimisation"
   ],
   "topic": "Numerical Optimization",
   "supervisor": "geetanjali-panda",
@@ -759,8 +756,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "analysis",
-   "scientific-computing"
+   "analysis"
   ],
   "topic": "Numerical Functional Analysis",
   "supervisor": "gnaneshwar-nelakanti",
@@ -778,8 +774,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "analysis",
-   "scientific-computing"
+   "analysis"
   ],
   "topic": "Numerical Functional Analysis",
   "supervisor": "gnaneshwar-nelakanti",
@@ -1163,8 +1158,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "differential-equations",
-   "scientific-computing"
+   "differential-equations"
   ],
   "topic": "Numerical Solutions for Time-Dependent PDEs",
   "supervisor": "naveen-kumar-garg",
@@ -1182,8 +1176,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "differential-equations",
-   "scientific-computing"
+   "differential-equations"
   ],
   "topic": "Numerical Methods for Systems of Hyperbolic PDEs",
   "supervisor": "naveen-kumar-garg",
@@ -1327,8 +1320,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "topology",
-   "scientific-computing"
+   "topology"
   ],
   "topic": "Computational Topology",
   "supervisor": "prateep-chakraborty",
@@ -1346,8 +1338,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "topology",
-   "scientific-computing"
+   "topology"
   ],
   "topic": "Computational Topology",
   "supervisor": "prateep-chakraborty",
@@ -1512,8 +1503,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "differential-equations",
-   "scientific-computing"
+   "differential-equations"
   ],
   "topic": "Analytical and numerical study of ODEs and PDEs",
   "supervisor": "rajni-kant-pandey",
@@ -1878,8 +1868,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "differential-equations",
-   "scientific-computing"
+   "differential-equations"
   ],
   "topic": "Numerical Solution of PDEs",
   "supervisor": "somnath-bhattacharyya",
@@ -1933,8 +1922,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "fluid-dynamics",
-   "scientific-computing"
+   "fluid-dynamics"
   ],
   "topic": "Numerical Modelling of Microfluidics",
   "supervisor": "somnath-bhattacharyya",
@@ -1952,8 +1940,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "fluid-dynamics",
-   "scientific-computing"
+   "fluid-dynamics"
   ],
   "topic": "Microfluidics modeling and simulation",
   "supervisor": "somnath-bhattacharyya",
@@ -2196,7 +2183,7 @@
   "photo": "",
   "areas": [
    "algebra",
-   "data-analysis"
+   "artificial-intelligence"
   ],
   "topic": "Multilinear Tensor Algebra for Deep Learning and Medical Imaging",
   "supervisor": "swanand-ravindra-khare",
@@ -2305,8 +2292,7 @@
   "status": "current",
   "photo": "",
   "areas": [
-   "differential-equations",
-   "scientific-computing"
+   "differential-equations"
   ],
   "topic": "Analytical and numerical study of differential equations and their applications",
   "supervisor": "t-raja-sekhar",

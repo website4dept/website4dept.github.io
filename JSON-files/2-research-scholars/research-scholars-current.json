@@ -7,7 +7,7 @@
     "status": "current",
     "photo": "",
     "areas": [
-      "data-analysis"
+      "artificial-intelligence"
     ],
     "topic": "Application of Deep Learning",
     "supervisor": "adrijit-goswami",
@@ -296,7 +296,7 @@
     "status": "current",
     "photo": "",
     "areas": [
-      "data-analysis"
+      "artificial-intelligence"
     ],
     "topic": "Machine Learning",
     "supervisor": "buddhananda-banerjee",
@@ -536,7 +536,7 @@
     "status": "current",
     "photo": "",
     "areas": [
-      "data-analysis"
+      "artificial-intelligence"
     ],
     "topic": "Machine learning in healthcare",
     "supervisor": "debjani-chakraborty",
@@ -610,7 +610,7 @@
     "status": "current",
     "photo": "",
     "areas": [
-      "data-analysis",
+      "artificial-intelligence",
       "statistical-inference"
     ],
     "topic": "Machine learning in medical decision making",
@@ -2165,7 +2165,7 @@
     "photo": "",
     "areas": [
       "algebra",
-      "data-analysis"
+      "artificial-intelligence"
     ],
     "topic": "Multilinear Tensor Algebra for Deep Learning and Medical Imaging",
     "supervisor": "swanand-ravindra-khare",
