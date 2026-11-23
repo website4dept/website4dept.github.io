@@ -12,7 +12,7 @@
    ===================================================================== */
 window.DEPT_GALLERY = [
   { src: "gallery/iitkgp-campus.jpg", title: "IIT Kharagpur campus",  album: "Campus",     hero: true },
-  { src: "gallery/Dept Photo.jpeg",   title: "Department Entrance",           album: "Department", hero: true },
+  { src: "gallery/Dept Photo.jpeg",   title: "Department Entrance",   album: "Department", hero: true },
   { src: "slide-3.jpg",   title: "Research across disciplines",       album: "Research",   hero: true }
   /* add more, one per line, for example:
   ,{ src: "gallery/colloquium-1.jpg", title: "Student colloquium", album: "Events", date: "Nov 2026", hero: true }
