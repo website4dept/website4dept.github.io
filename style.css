@@ -1275,3 +1275,45 @@ h1,h2,h3,h4{font-weight:700}
 
 /* staff profile: short static page */
 .staff-simple{max-width:620px}
+
+/* =====================================================================
+   Book a room — the public booking page (room-booking.html)
+   ===================================================================== */
+.rb-layout{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:32px;align-items:start}
+.rb-main .pform{background:#fff;border:1px solid var(--line,#dfe5e8);padding:26px 28px}
+.rb-form h3{font-family:"Source Serif 4",Georgia,serif;font-size:19px;margin:4px 0 16px;
+  padding-bottom:10px;border-bottom:2px solid var(--gold,#c9a227)}
+.rb-form h3 + .rb-grid{margin-bottom:26px}
+.rb-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 18px}
+.rb-grid label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700;color:#36474f}
+.rb-grid .lbl{display:block;line-height:1.35}
+.rb-grid .req{color:var(--maroon);font-weight:800}
+.rb-grid label.full{grid-column:1/-1}
+.rb-grid label.check{grid-column:1/-1;flex-direction:row;align-items:center;gap:10px;font-weight:600}
+/* a tick box must not stretch like a text field */
+.rb-grid label.check input[type=checkbox]{width:auto;flex:0 0 auto;min-width:18px;height:18px;margin:0}
+/* the blank label that lines the opening-hours note up on a wide screen
+   is only a spacer, so it is dropped once the form is one column */
+@media(max-width:900px){.rb-grid .rb-spacer .lbl{display:none}.rb-grid .rb-spacer{margin-top:-8px}}
+.rb-grid input,.rb-grid select,.rb-grid textarea{font:inherit;font-size:15px;font-weight:400;
+  padding:11px 12px;border:1px solid #cfd8dc;background:#fff;border-radius:0;width:100%}
+.rb-grid input:focus,.rb-grid select:focus,.rb-grid textarea:focus{outline:2px solid var(--maroon);outline-offset:1px}
+.rb-grid .field-note{font-weight:400;font-size:12px;color:var(--muted,#5b6b73);line-height:1.45}
+.rb-grid .req{color:var(--maroon)}
+.rb-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
+.rb-free{margin:22px 0 4px;padding:15px 17px;background:#f4f7f8;border:1px solid #dfe5e8}
+.rb-free h4{margin:0 0 9px;font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#5b6b73}
+.rb-free .hint{margin:4px 0 0}
+.rb-slots{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.rb-slots li{background:#fff;border:1px solid #dfe5e8;border-left:3px solid var(--maroon);padding:7px 11px;font-size:14px}
+.rb-slots li small{color:var(--muted,#5b6b73);margin-left:6px}
+.rb-warn{color:var(--maroon);font-weight:700;margin:0}
+.rb-status{padding:14px 18px;margin-bottom:22px;border:1px solid #dfe5e8;background:#f4f7f8;font-size:15px}
+.rb-status.is-warn{border-left:4px solid var(--maroon);background:#fdf3f3}
+.rb-side .surface + .surface{margin-top:18px}
+.rb-steps{margin:0;padding-left:20px;font-size:14px;line-height:1.75;color:#36474f}
+.rb-code .rb-otp{max-width:200px;font-size:24px;letter-spacing:7px;text-align:center;font-weight:700}
+.rb-done .rb-ref{font-size:17px;margin:6px 0 14px}
+.rb-cta{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+@media(max-width:900px){.rb-layout{grid-template-columns:1fr}.rb-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.rb-grid{grid-template-columns:1fr}.rb-main .pform{padding:20px 18px}}

@@ -214,9 +214,11 @@
   /* ------------------------------------------------------------------ */
   /* DASHBOARD                                                           */
   /* ------------------------------------------------------------------ */
-  const ROLE_LABEL = {admin: 'Admin', member: 'Member', notices: 'Content editor', people: 'People editor'};
+  const ROLE_LABEL = {admin: 'Admin', member: 'Member', notices: 'Content editor', people: 'People editor',
+                      office: 'Booking office', hod: 'Head of Department'};
   const VIEWS = {};
   let dirty = false;
+
   window.addEventListener('beforeunload', e => { if (dirty){ e.preventDefault(); e.returnValue = ''; } });
 
   async function initDashboard(){
@@ -254,6 +256,10 @@
     } else if (ME.role === 'people'){
       items.push(['People editor'], ['people', '☷', 'People & profiles'], ['scholars', '🎓', 'Research scholars'], ['students', '🧑‍🎓', 'Students']);
     }
+    (window.PORTAL_MODULES || []).forEach(function(m){
+      try { if (m.nav) m.nav(items, ME); if (m.views) m.views(VIEWS); }
+      catch (e) { console.error('portal module failed:', e); }
+    });
     buildNav(items);
     window.addEventListener('hashchange', route);
     route();
@@ -291,6 +297,13 @@
   const head = (title, sub, actions) =>
     '<div class="view-head"><div><div class="eyebrow">Department portal</div><h2>' + esc(title) + '</h2>' +
     (sub ? '<p>' + sub + '</p>' : '') + '</div>' + (actions ? '<div class="view-actions">' + actions + '</div>' : '') + '</div>';
+  /* Add-on modules (bookings.js) register themselves in window.PORTAL_MODULES before
+     this file runs. They use these helpers and add their own pages to VIEWS. */
+  window.PORTAL = {
+    api: api, esc: esc, toast: toast, alertBox: alertBox, busy: busy, head: head,
+    $: $, $$: $$, fmtDate: fmtDate, VIEWS: VIEWS,
+    me: function(){ return ME; }, go: function(h){ location.hash = h; }
+  };
 
   /* ---------------- change password ---------------- */
   VIEWS.password = function(forced){
@@ -645,7 +658,7 @@
         '<label>Official e-mail<input type="email" name="email" required placeholder="name@' + esc(d.domains[0] || 'iitkgp.ac.in') + '"></label>' +
         '<label>Link to profile <span class="field-note">(research scholars can’t have accounts – the admin edits their profiles)</span><select name="person_id">' + peopleOpts + '</select></label>' +
         '<label>Display name <span class="field-note">(optional – taken from the profile)</span><input name="name"></label>' +
-        '<label>Role<select name="role"><option value="member">Member – edits own profile</option><option value="admin">Admin – full access</option><option value="notices">Content editor – notices, events, gallery only</option><option value="people">People editor – profiles and scholars only</option></select></label>' +
+        '<label>Role<select name="role"><option value="member">Member – edits own profile</option><option value="admin">Admin – full access</option><option value="notices">Content editor – notices, events, gallery only</option><option value="people">People editor – profiles and scholars only</option><option value="office">Booking office – room requests</option><option value="hod">Head of Department – booking approvals</option></select></label>' +
         '<label class="check full"><input type="checkbox" name="send_invite" checked> Send the invitation e-mail now</label>' +
       '</div><div><button class="btn btn-maroon" type="submit">Create account</button></div></form></div>' +
       '<div class="card"><h3>Create several accounts</h3><p class="hint">One per line: <code>e-mail, profile-id</code> (profile id is optional — find it in People &amp; profiles). Invitations are sent to each.</p>' +
@@ -700,7 +713,7 @@
         if (a === 'invite'){ if (!confirm('Send a new invitation e-mail to ' + u.email + '? Any earlier link stops working.')) return; await api('POST', '/admin/users/' + id + '/invite'); toast('Invitation sent.'); }
         if (a === 'unlock'){ await api('PUT', '/admin/users/' + id, {unlock: true}); toast('Unlocked.'); }
         if (a === 'role'){
-          const r = prompt('Role for ' + u.email + ':\nmember = edits own profile\nadmin = full access\nnotices = notices, events, gallery only\npeople = profiles and scholars only', u.role);
+          const r = prompt('Role for ' + u.email + ':\nmember = edits own profile\nadmin = full access\nnotices = notices, events, gallery only\npeople = profiles and scholars only\noffice = booking office (room requests)\nhod = Head of Department (booking approvals)', u.role);
           if (r === null) return;
           await api('PUT', '/admin/users/' + id, {role: r.trim().toLowerCase()}); toast('Role changed.');
         }

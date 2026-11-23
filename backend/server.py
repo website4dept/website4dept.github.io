@@ -73,6 +73,10 @@ DEFAULT_CONFIG = {
     "otp_minutes": 10,
     "otp_max_attempts": 5,
     "session_hours": 8,
+    # BOOKING SYSTEM: how many people may be signed in to one shared account at once.
+    # Keyed by role; a role not listed here has no limit. The office account is shared
+    # by the two staff, so a third sign-in ends the oldest session.
+    "session_limits": {"office": 2},
     "max_failed_logins": 5,
     "lockout_minutes": 15,
     "min_password_length": 10,
@@ -318,10 +322,16 @@ DEFAULT_NOTICES = [
 ]
 
 
+# add-on modules (see bookings.py). Each one provides init_db() and install().
+EXTENSIONS = []
+
+
 def init_db(verbose=True):
     os.makedirs(CFG["data_dir"], exist_ok=True)
     os.makedirs(OUTBOX, exist_ok=True)
     db().executescript(SCHEMA)
+    for _mod in EXTENSIONS:                      # BOOKING SYSTEM: its tables
+        _mod.init_db()
     if q1("SELECT COUNT(*) c FROM people")["c"] == 0:
         src = os.path.join(CFG["site_root"], "people-data.js")
         if os.path.exists(src):
@@ -345,13 +355,18 @@ def init_db(verbose=True):
 # ---------------------------------------------------------------------------
 # E-mail
 # ---------------------------------------------------------------------------
-def build_message(to, subject, text, html=None, reply_to=None):
+def build_message(to, subject, text, html=None, reply_to=None, cc=None, in_reply_to=None):
     m = CFG["mail"]
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = formataddr((m["from_name"], m["from_email"]))
     msg["To"] = to
+    if cc:                                          # BOOKING SYSTEM: advisor + office on the same mail
+        msg["Cc"] = ", ".join([a for a in (cc if isinstance(cc, (list, tuple)) else [cc]) if a])
     msg["Message-ID"] = make_msgid(domain=m["from_email"].split("@")[-1])
+    if in_reply_to:                                 # BOOKING SYSTEM: keeps the booking in one thread
+        msg["In-Reply-To"] = in_reply_to
+        msg["References"] = in_reply_to
     if reply_to or m.get("reply_to"):
         msg["Reply-To"] = reply_to or m["reply_to"]
     msg.set_content(text)
@@ -360,9 +375,16 @@ def build_message(to, subject, text, html=None, reply_to=None):
     return msg
 
 
-def send_mail(to, subject, text, html=None, reply_to=None):
-    """Send one e-mail. Raises on failure."""
-    msg = build_message(to, subject, text, html, reply_to)
+def send_mail(to, subject, text, html=None, reply_to=None, cc=None, in_reply_to=None):
+    """
+    Send one e-mail. Raises on failure.
+    Returns the Message-ID, so a later e-mail can be put in the same thread by
+    passing it back as in_reply_to (used by the booking system).
+    cc takes a single address or a list.
+    """
+    msg = build_message(to, subject, text, html, reply_to, cc, in_reply_to)
+    msg_id = msg["Message-ID"]
+    cc_list = [a for a in (cc if isinstance(cc, (list, tuple)) else ([cc] if cc else [])) if a]
     m = CFG["mail"]
     if m["mode"] == "console":
         os.makedirs(OUTBOX, exist_ok=True)
@@ -371,10 +393,12 @@ def send_mail(to, subject, text, html=None, reply_to=None):
             f.write(bytes(msg))
         print("\n----- E-MAIL (console mode, saved to data/outbox/{}) -----".format(name))
         print("To:", to)
+        if cc_list:
+            print("Cc:", ", ".join(cc_list))
         print("Subject:", subject)
         print(text)
         print("-----------------------------------------------------------\n", flush=True)
-        return
+        return msg_id
     if m["smtp_security"] == "ssl":
         server = smtplib.SMTP_SSL(m["smtp_host"], int(m["smtp_port"]), timeout=30)
     else:
@@ -390,6 +414,7 @@ def send_mail(to, subject, text, html=None, reply_to=None):
             server.quit()
         except Exception:
             pass
+    return msg_id
 
 
 def html_wrap(title, body_html):
@@ -478,9 +503,32 @@ def create_session(user_id, ip):
     raw = secrets.token_urlsafe(32)
     csrf = secrets.token_urlsafe(24)
     q("DELETE FROM sessions WHERE expires < ?", (iso(now()),))
+    enforce_session_limit(user_id)
     q("INSERT INTO sessions(hash,user_id,csrf,expires,created,ip) VALUES(?,?,?,?,?,?)",
       (sha256(raw), user_id, csrf, iso(now() + timedelta(hours=CFG["session_hours"])), iso(now()), ip))
     return raw, csrf
+
+
+def enforce_session_limit(user_id):
+    """
+    BOOKING SYSTEM: shared accounts (the department office) may be used by a set
+    number of people at once. When one more signs in, the session that has been
+    open longest is ended, so nobody is locked out by a colleague who simply
+    closed the browser without logging out.
+    Set the numbers in config.json under "session_limits", e.g. {"office": 2}.
+    """
+    u = q1("SELECT role FROM users WHERE id=?", (user_id,))
+    limit = (CFG.get("session_limits") or {}).get(u["role"]) if u else None
+    if not limit or limit < 1:
+        return
+    # rowid breaks the tie when two sessions start in the same second
+    rows = q("SELECT hash FROM sessions WHERE user_id=? ORDER BY created DESC, rowid DESC",
+             (user_id,)).fetchall()
+    for extra in rows[limit - 1:]:                 # keep (limit - 1); the new one makes up the number
+        q("DELETE FROM sessions WHERE hash=?", (extra["hash"],))
+    if len(rows) >= limit:
+        audit("system", "session.evicted", str(user_id),
+              "{} already signed in (limit {})".format(len(rows), limit), "")
 
 
 def session_cookie(value, max_age):
@@ -1725,6 +1773,7 @@ def api_students_import(req):
     rows = expand_student_rows(req.json())
     cur = {x["id"]: x for x in students_items()}
     added = updated = 0
+    mailed = 0
     for r in rows[:6000]:
         if not isinstance(r, dict):
             continue
@@ -1735,9 +1784,29 @@ def api_students_import(req):
         else:
             cur[it["id"]] = it
             added += 1
+        # BOOKING SYSTEM: an "email" in the file goes to the mailing list, NOT to the
+        # student record. The student list is published to the website as
+        # students-data.js, and student addresses must never appear there.
+        mailed += store_student_email(r, it)
     set_setting("students", list(cur.values()))
-    audit(u["email"], "students.imported", "", "{} added, {} updated".format(added, updated), req.ip)
-    return {"ok": True, "added": added, "updated": updated}
+    audit(u["email"], "students.imported", "",
+          "{} added, {} updated, {} e-mail addresses".format(added, updated, mailed), req.ip)
+    return {"ok": True, "added": added, "updated": updated, "emails": mailed}
+
+
+def store_student_email(raw, student):
+    """
+    Keeps a student's address in the portal's own contacts table (the mailing
+    lists), which never leaves the server. That address is what lets them use
+    the booking form on the website.
+    """
+    email = str(raw.get("email", "")).strip().lower()
+    if not email or "@" not in email:
+        return 0
+    grp = str(raw.get("list") or "{}-{}".format(student["programme"], student.get("batch", "")) or "students").strip("-")
+    q("INSERT INTO contacts(name,email,grp) VALUES(?,?,?) ON CONFLICT(email,grp) DO UPDATE SET name=excluded.name",
+      (student["name"], email, grp))
+    return 1
 
 
 @route("POST", "/api/admin/notice-file")
@@ -2209,6 +2278,17 @@ def cli():
             httpd.serve_forever()
         except KeyboardInterrupt:
             print("\nStopped.")
+
+
+# ---------------------------------------------------------------------------
+# BOOKING SYSTEM: seminar halls and classrooms (backend/bookings.py).
+# Delete these four lines and bookings.py to switch the feature off.
+# ---------------------------------------------------------------------------
+try:
+    import bookings as _bookings
+    _bookings.install(sys.modules[__name__])
+except Exception as _e:                       # the rest of the portal must still run
+    print("[portal] booking system not loaded:", _e)
 
 
 # make sure tables exist when imported by a WSGI server (gunicorn / mod_wsgi)

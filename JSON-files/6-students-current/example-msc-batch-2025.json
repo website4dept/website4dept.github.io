@@ -2,10 +2,16 @@
   "programme": "msc",
   "batch": 2025,
   "students": [
-    "Student One",
+    {
+      "name": "Student One",
+      "roll": "25MA10001",
+      "email": "student1@kgpian.iitkgp.ac.in"
+    },
     {
       "name": "Student Two",
-      "roll": "25MA10002"
-    }
+      "roll": "25MA10002",
+      "email": "student2@kgpian.iitkgp.ac.in"
+    },
+    "Student Three (name only - no booking access until an e-mail is added)"
   ]
 }
