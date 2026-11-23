@@ -27,3 +27,28 @@ window.DEPT_STUDENTS = [
   { name: "D. Alumna", programme: "bsms", status: "alumni", passout: 2025, outcome: "higher", org: "University name", role: "Ph.D. in Mathematics" }
   */
 ];
+
+/* =====================================================================
+   JOB OPPORTUNITIES — shown under Students › Job Opportunity
+   =====================================================================
+   One entry per opening. Only "title" is required.
+   title        the post, e.g. "Junior Research Fellow (JRF)"
+   org          department, lab, project or company
+   type         short label shown as a tag, e.g. "JRF", "Project", "Internship", "Placement"
+   detail       one or two lines about the work
+   eligibility  who may apply, e.g. "M.Sc. Mathematics with NET/GATE"
+   deadline     closing date as you want it printed, e.g. "15 Dec 2026"
+   url          link to the full advertisement (optional)
+   status       "open" (default) or "closed" — closed entries are not shown
+   ===================================================================== */
+window.DEPT_JOBS = [
+  /* examples (remove the comment marks to use):
+  { title: "Junior Research Fellow (JRF)", org: "Department of Mathematics, IIT Kharagpur",
+    type: "JRF", detail: "SERB-funded project on hyperbolic conservation laws.",
+    eligibility: "M.Sc. Mathematics with NET/GATE", deadline: "15 Dec 2026",
+    url: "https://www.iitkgp.ac.in/", status: "open" },
+  { title: "Summer internship — data science", org: "Company name",
+    type: "Internship", detail: "Eight-week internship for pre-final year students.",
+    eligibility: "BS-MS / M.Sc. third year", deadline: "31 Jan 2027" }
+  */
+];

@@ -29,46 +29,6 @@ const pages = [
   {name:'People › Administrative & Technical Staff',url:'people.html#staff',words:'staff office administrative technical'},
   {name:'People › Alumni',url:'people.html#alumni',words:'alumni former students graduated phd postdoc'},
   {name:'People › Former Faculty',url:'people.html#former-faculty',words:'former retired faculty'},
-  {name:'Faculty › Adrijit Goswami',url:'profile.html?id=adrijit-goswami',words:'faculty professor'},
-  {name:'Faculty › Aniket Biswas',url:'profile.html?id=aniket-biswas',words:'faculty professor'},
-  {name:'Faculty › Apurba Das',url:'profile.html?id=apurba-das',words:'faculty professor'},
-  {name:'Faculty › Arindam Banerjee',url:'profile.html?id=arindam-banerjee',words:'faculty professor'},
-  {name:'Faculty › Bappaditya Bhowmik',url:'profile.html?id=bappaditya-bhowmik',words:'faculty professor'},
-  {name:'Faculty › Bodhayan Roy',url:'profile.html?id=bodhayan-roy',words:'faculty professor'},
-  {name:'Faculty › Buddhananda Banerjee',url:'profile.html?id=buddhananda-banerjee',words:'faculty professor'},
-  {name:'Faculty › Chandal Nahak',url:'profile.html?id=chandal-nahak',words:'faculty professor'},
-  {name:'Faculty › Debapriya Biswas',url:'profile.html?id=debapriya-biswas',words:'faculty professor'},
-  {name:'Faculty › Debjani Chakraborty',url:'profile.html?id=debjani-chakraborty',words:'faculty professor'},
-  {name:'Faculty › Dipankar Ghosh',url:'profile.html?id=dipankar-ghosh',words:'faculty professor'},
-  {name:'Faculty › Firoj Sk',url:'profile.html?id=firoj-sk',words:'faculty professor'},
-  {name:'Faculty › G P Raja Sekhar',url:'profile.html?id=g-p-raja-sekhar',words:'faculty professor'},
-  {name:'Faculty › Geetanjali Panda',url:'profile.html?id=geetanjali-panda',words:'faculty professor'},
-  {name:'Faculty › Gnaneshwar Nelakanti',url:'profile.html?id=gnaneshwar-nelakanti',words:'faculty professor'},
-  {name:'Faculty › Hari Shankar Mahato',url:'profile.html?id=hari-shankar-mahato',words:'faculty professor'},
-  {name:'Faculty › Husney Parvez Sarwar',url:'profile.html?id=husney-parvez-sarwar',words:'faculty professor'},
-  {name:'Faculty › Kamalakshya Mahatab',url:'profile.html?id=kamalakshya-mahatab',words:'faculty professor'},
-  {name:'Faculty › Koeli Ghoshal',url:'profile.html?id=koeli-ghoshal',words:'faculty professor'},
-  {name:'Faculty › Mithun Bhowmik',url:'profile.html?id=mithun-bhowmik',words:'faculty professor'},
-  {name:'Faculty › Mousumi Mandal',url:'profile.html?id=mousumi-mandal',words:'faculty professor'},
-  {name:'Faculty › Nabakumar Jana',url:'profile.html?id=nabakumar-jana',words:'faculty professor'},
-  {name:'Faculty › Naveen Kumar Garg',url:'profile.html?id=naveen-kumar-garg',words:'faculty professor'},
-  {name:'Faculty › Nitin Gupta',url:'profile.html?id=nitin-gupta',words:'faculty professor'},
-  {name:'Faculty › P V S N Murthy',url:'profile.html?id=p-v-s-n-murthy',words:'faculty professor'},
-  {name:'Faculty › Pawan Kumar',url:'profile.html?id=pawan-kumar',words:'faculty professor'},
-  {name:'Faculty › Prateep Chakraborty',url:'profile.html?id=prateep-chakraborty',words:'faculty professor'},
-  {name:'Faculty › Pratima Panigrahi',url:'profile.html?id=pratima-panigrahi',words:'faculty professor'},
-  {name:'Faculty › Rajni Kant Pandey',url:'profile.html?id=rajni-kant-pandey',words:'faculty professor'},
-  {name:'Faculty › Ramakrishna Nanduri',url:'profile.html?id=ramakrishna-nanduri',words:'faculty professor'},
-  {name:'Faculty › Ratna Dutta',url:'profile.html?id=ratna-dutta',words:'faculty professor'},
-  {name:'Faculty › Rupanwita Gayen',url:'profile.html?id=rupanwita-gayen',words:'faculty professor'},
-  {name:'Faculty › Somesh Kumar',url:'profile.html?id=somesh-kumar',words:'faculty professor'},
-  {name:'Faculty › Somnath Bhattacharyya',url:'profile.html?id=somnath-bhattacharyya',words:'faculty professor'},
-  {name:'Faculty › Soumitra Ghara',url:'profile.html?id=soumitra-ghara',words:'faculty professor'},
-  {name:'Faculty › Soumyarup Banerjee',url:'profile.html?id=soumyarup-banerjee',words:'faculty professor'},
-  {name:'Faculty › Sourav Mukhopadhyay',url:'profile.html?id=sourav-mukhopadhyay',words:'faculty professor'},
-  {name:'Faculty › Swanand Ravindra Khare',url:'profile.html?id=swanand-ravindra-khare',words:'faculty professor'},
-  {name:'Faculty › Swarup Kumar Panda',url:'profile.html?id=swarup-kumar-panda',words:'faculty professor'},
-  {name:'Faculty › T Raja Sekhar',url:'profile.html?id=t-raja-sekhar',words:'faculty professor'},
   {name:'Academics',url:'academics.html',words:'programmes courses undergraduate postgraduate doctoral admissions'},
   {name:'Academics › Programmes Overview',url:'academics.html#programmes',words:'programmes degrees overview'},
   {name:'Academics › BS-MS (Integrated)',url:'academics.html#bs-ms',words:'bs-ms bs ms integrated msc undergraduate dual degree'},
@@ -76,19 +36,45 @@ const pages = [
   {name:'Academics › M.Tech. (CSDP)',url:'academics.html#mtech',words:'mtech m.tech csdp computer science data processing gate'},
   {name:'Academics › Ph.D.',url:'academics.html#phd',words:'phd ph.d doctoral research'},
   {name:'Academics › Courses & Curriculum',url:'academics.html#courses',words:'courses curriculum syllabus timetable'},
-  {name:'Academics › Admissions',url:'academics.html#admissions',words:'admissions apply eligibility'},
+  {name:'Academics › Admissions (IIT Kharagpur)',url:'https://www.iitkgp.ac.in/navpage/admissions',words:'admissions apply eligibility jee advanced jam gate phd institute'},
   {name:'Students',url:'students.html',words:'students research scholars resources teaching seminars'},
   {name:'Students › BS-MS Students',url:'students.html#bs-ms-students',words:'bs-ms students integrated'},
   {name:'Students › M.Sc. Students',url:'students.html#msc-students',words:'msc m.sc students'},
   {name:'Students › M.Tech. Students',url:'students.html#mtech-students',words:'mtech m.tech csdp students'},
-  {name:'Students › Student Notices',url:'students.html#notices',words:'notices student announcements exam'},
   {name:'Students › Student Activities',url:'students.html#activities',words:'activities colloquium clubs culture sports extracurricular'},
   {name:'Students › Achievements',url:'students.html#achievements',words:'achievements awards fellowships recognitions'},
-  {name:'Students › Placements & Industry',url:'students.html#placements',words:'placements industry internships careers higher studies'},
+  {name:'Students › Placement',url:'students.html#placement',words:'placement placements campus recruitment internships careers higher studies cdc recruiters'},
+  {name:'Students › Job Opportunity',url:'students.html#job-opportunity',words:'job opportunity opportunities jobs openings vacancy vacancies recruitment jrf srf project fellowship internship career'},
   {name:'News & Events',url:'news-events.html',words:'announcements seminars lectures news academic events'},
   {name:'Publications',url:'publications.html',words:'research publications papers articles bibliography'},
   {name:'Contact Us',url:'contact.html',words:'contact us address phone telephone fax email e-mail office map location directions route railway station airport kolkata reach Kharagpur West Bengal'},
 ];
+
+/* ===== People in the site search =====
+   Built from people-data.js (loaded on every page), so faculty, adjunct faculty,
+   postdoctoral fellows, research scholars and staff are ALL searchable here —
+   not only faculty. Nothing to maintain by hand: add a person to people-data.js
+   and they become searchable everywhere. */
+(function(){
+  const ALL = window.DEPT_PEOPLE || [];
+  const AREAS = window.DEPT_AREAS || {};
+  const LABEL = {faculty:'Faculty', adjunct:'Adjunct & INSPIRE Faculty', postdoc:'Postdoctoral Fellows',
+                 scholar:'Research Scholars', staff:'Staff'};
+  ALL.forEach(p=>{
+    if(!p || !p.id || !p.name || p.status==='sample') return;
+    let group = LABEL[p.type] || 'People';
+    if(p.status==='former') group = 'Former Faculty';
+    else if(p.status==='alumni') group = 'Alumni';
+    const sup = p.supervisor && ALL.find(x=>x.id===p.supervisor);
+    const words = [p.type, p.designation, p.grade, p.topic, p.roll, p.now, p.email,
+                   p.head ? 'head of the department hod' : '',
+                   sup ? 'supervisor ' + sup.name : '',
+                   p.cosupervisor ? 'co-supervisor ' + p.cosupervisor : '',
+                   (p.areas||[]).map(a=>AREAS[a]).filter(Boolean).join(' '),
+                   group].filter(Boolean).join(' ');
+    pages.push({name: group + ' › ' + p.name, url: 'profile.html?id=' + encodeURIComponent(p.id), words: words});
+  });
+})();
 const nav=document.getElementById('navLinks');
 function closeDropdowns(){document.querySelectorAll('.has-dropdown.open').forEach(d=>{d.classList.remove('open');const b=d.querySelector('.dropdown-toggle');if(b)b.setAttribute('aria-expanded','false');});}
 const menu=document.getElementById('menuToggle');
@@ -126,9 +112,20 @@ function renderSearch(){
   searchResults.replaceChildren();
   searchResults.classList.toggle('visible',!!q);
   if(!q)return;
-  const matches=pages.filter(p=>(p.name+' '+p.words).toLowerCase().includes(q));
-  if(matches.length===0){const p=document.createElement('p');p.textContent='No page titles or topics match your search.';searchResults.append(p);return;}
-  for(const item of matches){const a=document.createElement('a');a.href=item.url;a.textContent=item.name;searchResults.append(a);}
+  const toks=q.split(/\s+/).filter(Boolean);
+  const matches=pages.filter(p=>{const hay=(p.name+' '+p.words).toLowerCase();return toks.every(t=>hay.includes(t));});
+  if(matches.length===0){const p=document.createElement('p');p.textContent='Nothing on the site matches that. Try a name, a research area or a page name.';searchResults.append(p);return;}
+  const LIMIT=40;
+  if(matches.length>LIMIT){
+    const n=document.createElement('p');
+    n.textContent=matches.length+' matches — showing the first '+LIMIT+'.';
+    searchResults.append(n);
+  }
+  for(const item of matches.slice(0,LIMIT)){
+    const a=document.createElement('a');a.href=item.url;a.textContent=item.name;
+    if(/^https?:/i.test(item.url)){a.target='_blank';a.rel='noopener noreferrer';}
+    searchResults.append(a);
+  }
 }
 if(searchInput)searchInput.addEventListener('input',renderSearch);
 if(searchForm)searchForm.addEventListener('submit',e=>{e.preventDefault();renderSearch();const first=searchResults?.querySelector('a');if(first)first.focus();});
@@ -142,24 +139,29 @@ if(searchForm)searchForm.addEventListener('submit',e=>{e.preventDefault();render
   const templates=[...wrap.querySelectorAll('[data-photo-template]')];
   templates.forEach(t=>t.remove());
 
-  // photos come from gallery-data.js (entries with "hero": true); missing files are skipped
-  const wanted=(window.DEPT_GALLERY||[]).filter(p=>p&&p.hero&&p.src);
-  Promise.all(wanted.map(p=>new Promise(res=>{
-    const im=new Image();im.onload=()=>res(p);im.onerror=()=>res(null);im.src=p.src;
-  }))).then(list=>{
-    const photos=list.filter(Boolean);
-    const n=Math.max(templates.length,photos.length);
-    for(let i=0;i<n;i++){
-      const t=templates[i%templates.length].cloneNode(true);
-      t.removeAttribute('data-photo-template');
-      const p=photos[i];
-      const media=t.querySelector('.hero-media'),img=t.querySelector('img');
-      if(p){img.src=p.src;img.alt=p.title||'';const cap=t.querySelector('.hero-caption');if(cap&&p.title&&i>=templates.length)cap.textContent=p.title;}
-      else{if(img)img.remove();if(media)media.classList.add('no-photo');}
-      wrap.append(t);
+  // photos come from gallery-data.js (entries with "hero": true).
+  // The slides are built straight away so the slideshow never waits for a download;
+  // a photo whose file is missing falls back to the plain panel.
+  const photos=(window.DEPT_GALLERY||[]).filter(p=>p&&p.hero&&p.src);
+  const n=Math.max(templates.length,photos.length);
+  for(let i=0;i<n;i++){
+    const t=templates[i%templates.length].cloneNode(true);
+    t.removeAttribute('data-photo-template');
+    const p=photos[i];
+    const media=t.querySelector('.hero-media'),img=t.querySelector('img');
+    if(p&&img){
+      img.alt=p.title||'';
+      img.loading=i<2?'eager':'lazy';
+      img.decoding='async';
+      img.addEventListener('error',()=>{if(media)media.classList.add('no-photo');img.remove();});
+      img.src=p.src;
+      const cap=t.querySelector('.hero-caption');
+      if(cap&&p.title&&i>=templates.length)cap.textContent=p.title;
     }
-    start();
-  });
+    else{if(img)img.remove();if(media)media.classList.add('no-photo');}
+    wrap.append(t);
+  }
+  start();
 
   function start(){
     const slides=[...wrap.querySelectorAll('.hero-slide')];

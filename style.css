@@ -1258,3 +1258,20 @@ h1,h2,h3,h4{font-weight:700}
 .stu-stats b{display:block;font:700 34px "Source Serif 4",Georgia,serif;color:var(--maroon)}
 .stu-stats span{font-size:13px;color:var(--muted,#5b6b73)}
 .stu-recent{max-width:760px;margin-bottom:10px}
+
+/* Students › Placement / Job Opportunity */
+.stu-cdc{margin-top:28px}
+.stu-jobs{margin:26px 0 30px}
+.job-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--line,#dfe5e8)}
+.job-item{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:18px;
+  padding:18px 4px;border-bottom:1px solid var(--line,#dfe5e8);align-items:start}
+.job-item h3{margin:0 0 4px;font-size:18px}
+.job-org{margin:0 0 6px;font-weight:600;color:var(--maroon)}
+.job-detail{margin:0;color:var(--muted,#5b6b73)}
+.job-meta{display:flex;flex-direction:column;align-items:flex-start;gap:7px;font-size:14px}
+.job-deadline{font-weight:700}
+.job-elig{color:var(--muted,#5b6b73)}
+@media(max-width:700px){.job-item{grid-template-columns:1fr;gap:10px}}
+
+/* staff profile: short static page */
+.staff-simple{max-width:620px}

@@ -297,6 +297,31 @@
     const isFaculty = ['faculty', 'adjunct'].includes(p.type);
     const t = titleOf(p);
 
+    /* ----- administrative & technical staff: short static profile (no tabs) -----
+       Staff pages stay minimal — designation and contact details only, like the
+       scholar pages. They do NOT get the faculty tabs (publications, projects,
+       students, teaching, activities). */
+    if (p.type === 'staff'){
+      const row = (k, v) => '<li><span>' + k + '</span>' + v + '</li>';
+      const r = [];
+      r.push(row('Designation', p.designation ? esc(p.designation) : '—'));
+      r.push(row('Official email', p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '—'));
+      r.push(row('Phone', p.phone ? '<a href="tel:' + esc(String(p.phone).replace(/[^+\d]/g, '')) + '">' + esc(p.phone) + '</a>' : '—'));
+      r.push(row('Office', p.office ? esc(p.office) : 'Department of Mathematics, IIT Kharagpur'));
+      if (p.responsibilities && p.responsibilities.length)
+        r.push(row('Responsibilities', arr(p.responsibilities).map(esc).join(' · ')));
+      head.innerHTML =
+        '<div class="profile-head-grid">' + photoHTML(p, 'profile-photo') +
+          '<div><div class="eyebrow">' + (p.status === 'former' ? 'Former Staff' : 'Administrative &amp; Technical Staff') + '</div>' +
+          '<h2>' + esc(p.name) + '</h2>' +
+          '<p class="profile-title">' + esc(p.designation || 'Staff') + ', Department of Mathematics</p></div></div>';
+      body.innerHTML =
+        '<div class="profile-layout"><div class="profile-main"><div class="surface">' +
+          '<h3>Contact details</h3><ul class="profile-contact staff-simple">' + r.join('') + '</ul></div>' +
+          '<p class="profile-back"><a class="link-arrow" href="people.html#' + esc(p.id) + '">← Back to people directory</a></p></div></div>';
+      return;
+    }
+
     /* ----- research scholars: short profile (supervisor, email, area, roll no., office) ----- */
     if (p.type === 'scholar'){
       const sv = p.supervisor && findPerson(p.supervisor);

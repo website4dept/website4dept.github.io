@@ -1,15 +1,16 @@
 /* Students page: overview (photo cards) -> one section at a time.
    Photos come from gallery-data.js: give a photo the album name of a section
-   ("Programmes", "Student Activities", "Achievements", "Placements") and it appears here.
+   ("Programmes", "Student Activities", "Achievements", "Placement", "Job Opportunity")
+   and it appears here.
    Sections without photos show a neutral placeholder. */
 (function(){
   'use strict';
   const SECS = [
-    ['programmes',  'Programmes',            'BS-MS, M.Sc. and M.Tech. resources.',        'Programmes'],
-    ['activities',  'Student activities',    'Clubs, culture, sports and outreach.',       'Student Activities'],
-    ['achievements','Achievements',          'Awards, exams and recognitions.',            'Achievements'],
-    ['placements',  'Placements & industry', 'Careers, internships and higher studies.',  'Placements'],
-    ['notices',     'Student notices',       'Exams, schedules and announcements.',        'Student Notices']
+    ['programmes',     'Programmes',        'BS-MS, M.Sc. and M.Tech. resources.',          'Programmes'],
+    ['activities',     'Student activities','Clubs, culture, sports and outreach.',         'Student Activities'],
+    ['achievements',   'Achievements',      'Awards, exams and recognitions.',              'Achievements'],
+    ['placement',      'Placement',         'Campus placement, internships and higher studies.', 'Placement'],
+    ['job-opportunity','Job Opportunity',   'Openings, fellowships and career resources.',  'Job Opportunity']
   ];
   const SYM = ['∑', 'π', '∫', '∞', '∇'];
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -101,7 +102,27 @@
   document.addEventListener('click', e => { const b = e.target.closest('.stu-tabs .pill'); if (b) showProg(b.dataset.prog); });
   const progFromHash = h => { const id = decodeURIComponent((h || '').replace(/^#/, '')); const pg = PROGS.find(p => p[2] === id || id === p[0] + '-alumni'); return pg ? pg[0] : null; };
 
-  /* ---------- Placements & industry: summary from alumni data ---------- */
+  /* ---------- Job opportunity: openings listed in students-data.js (DEPT_JOBS) ---------- */
+  const jobBox = document.getElementById('jobData');
+  if (jobBox){
+    const jobs = (window.DEPT_JOBS || []).filter(j => j && j.title);
+    const open = jobs.filter(j => String(j.status || 'open').toLowerCase() !== 'closed');
+    jobBox.innerHTML = open.length
+      ? '<ul class="job-list">' + open.map(j => '<li class="job-item">' +
+          '<div class="job-main"><h3>' + esc(j.title) + '</h3>' +
+          (j.org ? '<p class="job-org">' + esc(j.org) + '</p>' : '') +
+          (j.detail ? '<p class="job-detail">' + esc(j.detail) + '</p>' : '') + '</div>' +
+          '<div class="job-meta">' +
+            (j.type ? '<span class="pill">' + esc(j.type) + '</span>' : '') +
+            (j.deadline ? '<span class="job-deadline">Apply by ' + esc(j.deadline) + '</span>' : '') +
+            (j.eligibility ? '<span class="job-elig">' + esc(j.eligibility) + '</span>' : '') +
+            (j.url ? '<a class="link-arrow" href="' + esc(j.url) + '" target="_blank" rel="noopener noreferrer">Details <span>→</span></a>' : '') +
+          '</div></li>').join('') + '</ul>'
+      : '<div class="empty-state"><h3>No openings listed at the moment</h3>' +
+        '<p>Current openings will appear here. Add them in <code>students-data.js</code> under <code>DEPT_JOBS</code>.</p></div>';
+  }
+
+  /* ---------- Placement: summary from alumni data ---------- */
   const plBox = document.getElementById('placementData');
   if (plBox){
     const alu = STU.filter(x => x.status === 'alumni');
