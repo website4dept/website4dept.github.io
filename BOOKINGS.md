@@ -205,14 +205,37 @@ python3 test_bookings.py     # 69 checks: the portal flow, permissions, clashes,
 python3 test_public.py       # 58 checks: the register, the six-digit code, threading,
                             # CC, what the public calendar may show, rate limits,
                             # and the two-at-a-time office account
-python3 test_extras.py       # 35 checks: the release link, no-shows, the Notice Board
-                            # tick and the Today sheet
+python3 test_extras.py       # 46 checks: the release link, no-shows, the Notice Board
+                            # tick, the Today sheet and the availability calendar
 ```
 
-162 checks in all. They run against the real server code through the real
+173 checks in all. They run against the real server code through the real
 addresses, not mocks.
 
 ---
+
+## 8a. The availability calendar
+
+The booking page opens on a **month calendar for the chosen room**, so somebody can
+see what is free before filling anything in.
+
+* Each day carries a coloured bar — **green** free, **gold** partly booked,
+  **maroon** fully booked, **grey** not available (already gone, past the booking
+  window, or a blocked date, with the reason shown).
+* Choosing a day lists what is already booked on it, and then the **free stretches
+  as buttons**. Pressing one fills the date and time into the form — an hour by
+  default, which can then be changed.
+* Changing the room reloads the month for that room. Months can be stepped through
+  up to the booking window and no further.
+
+It is served by `GET /api/bookings/open/month?room=…&month=YYYY-MM`, which needs no
+login and returns the month's bookings day by day together with the opening hours
+and the closed dates. The free stretches are worked out in the page from that one
+reply, so moving between days costs nothing. A stretch shorter than 30 minutes is
+not offered.
+
+Requests that are still waiting for a decision are shown as "also asked for" but do
+**not** block a slot — only a confirmed booking does.
 
 ## 8b. Rooms given back, rooms nobody used
 

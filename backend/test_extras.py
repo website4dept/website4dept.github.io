@@ -145,5 +145,47 @@ check("the date is written out in full", "20" in d["pretty"], d.get("pretty"))
 s, d = call("GET", "/api/bookings/today", sid=None)
 check("it is not public", s == 401, s)
 
+print("\n--- the availability calendar ---")
+import datetime as _dt
+MON = D[:7]
+s, d = call("GET", "/api/bookings/open/month", query="room=%d&month=%s" % (HALL, MON))
+check("a whole month comes back at once", s == 200 and d["month"] == MON, (s, d.get("month")))
+check("with the opening hours", d["day_start"] == "08:00" and d["day_end"] == "20:00", d)
+check("and the room it is for", d["room"]["name"] == "Seminar Hall", d.get("room"))
+check("days already gone are closed", all(v == "past" for k, v in d["closed"].items() if k < d["today"]),
+      {k: v for k, v in d["closed"].items() if k < d["today"]})
+check("the chosen day shows its bookings", D in d["days"], list(d["days"]))
+check("no login needed", s == 200)
+
+bookings.save_cfg({"blackout": [{"from": D, "to": D, "reason": "Institute holiday"}]})
+s, d = call("GET", "/api/bookings/open/month", query="room=%d&month=%s" % (HALL, MON))
+check("a blocked date is closed, with the reason", d["closed"].get(D) == "Institute holiday", d["closed"].get(D))
+bookings.save_cfg({"blackout": []})
+
+far = (server.now() + server.timedelta(days=200)).strftime("%Y-%m")
+s, d = call("GET", "/api/bookings/open/month", query="room=%d&month=%s" % (HALL, far))
+check("a month beyond the booking window is closed", all(v == "too far ahead" for v in d["closed"].values()),
+      set(d["closed"].values()))
+s, d = call("GET", "/api/bookings/open/month", query="room=%d&month=2026-13" % HALL)
+check("a nonsense month is refused", s == 400, (s, d.get("error")))
+
+# the same free-gap sum the page does, checked here against the data
+def gaps(day, lo="08:00", hi="20:00"):
+    m = lambda t: int(t[:2]) * 60 + int(t[3:5])
+    taken = sorted((m(b["start"]), m(b["end"])) for b in day if b["status"] == "approved")
+    out, at = [], m(lo)
+    for a, b2 in taken:
+        if a - at >= 30: out.append((at, a))
+        at = max(at, b2)
+    if m(hi) - at >= 30: out.append((at, m(hi)))
+    return out
+s, d = call("GET", "/api/bookings/open/month", query="room=%d&month=%s" % (HALL, MON))
+g = gaps(d["days"].get(D, []))
+check("free stretches work out round the booked ones", g and all(b - a >= 30 for a, b in g), g)
+check("and none of them overlaps a confirmed booking",
+      not any(a < int(b2["end"][:2]) * 60 + int(b2["end"][3:5]) and
+              int(b2["start"][:2]) * 60 + int(b2["start"][3:5]) < b
+              for a, b in g for b2 in d["days"].get(D, []) if b2["status"] == "approved"), g)
+
 print("\n%d passed, %d failed" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

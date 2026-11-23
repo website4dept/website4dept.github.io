@@ -4,6 +4,44 @@ Newest first. Each entry says what was asked for, which files changed, and why.
 
 ---
 
+## 23 November 2026 — Availability calendar on the booking page
+
+Requested: when someone opens Room Booking they should see the available dates and
+slots in a calendar.
+
+The page now opens on a month calendar for the chosen room. Days are marked free,
+partly booked, fully booked or not available; choosing one lists what is booked and
+offers the free stretches as buttons that fill the form in. Changing the room
+reloads the month. The form was reordered into three numbered steps around it.
+
+| File | Change |
+|---|---|
+| `backend/bookings.py` | `GET /api/bookings/open/month` — a month of bookings for one room, with opening hours and closed dates (past, beyond the window, blocked). No login |
+| `room-booking.js` | The calendar, the free-stretch buttons and the reordered form. The room chooser moved above the calendar |
+| `style.css` | Calendar grid, day states, legend and free-slot buttons, down to phone width |
+| `backend/test_extras.py` | 11 more checks: the month shape, closed days, blocked dates, the booking window, and that no free stretch overlaps a confirmed booking |
+
+**Fixed while testing:** the new code called a helper that only exists in the portal
+module, which stopped the booking page loading altogether.
+
+---
+
+## 23 November 2026 — Room Booking moved into the header
+
+Requested: no separate navigation tab, no card on the home page, just a small link
+beside Admin Login called **Room Booking**.
+
+| File | Change |
+|---|---|
+| all 12 HTML pages | The "Book a Room" tab removed from the main navigation; a `header-booking` link added beside Admin Login |
+| `index.html` | The "Book a room" card above the Notice Board removed; the hero button put back to "Academic Programmes", which it replaced earlier |
+| `style.css` | `.header-booking` outlined in maroon so Admin Login stays the stronger of the two; kept visible below 1100px like Admin Login, and icon-only on phones |
+| `room-booking.html` | Breadcrumb renamed to "Room Booking" |
+
+The page itself is unchanged.
+
+---
+
 ## 23 November 2026 — Rooms given back, today's sheet, Notice Board (stage 1c)
 
 Added from the list of suggestions, after "Do".

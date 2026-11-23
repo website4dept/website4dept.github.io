@@ -1118,6 +1118,57 @@ def api_open_availability(req):
                         "by": r["advisor_name"] or r["requester_name"] or ""} for r in rows]}
 
 
+def api_open_month(req):
+    """
+    A whole month for one room, so the booking page can show a calendar before
+    anybody types anything. Returns the confirmed bookings day by day, plus what
+    makes a day impossible (in the past, too far ahead, a blocked date).
+    """
+    public_on()
+    c = cfg()
+    room_id = int(req.query.get("room") or 0)
+    room = room_row(room_id) if room_id else None
+    month = str(req.query.get("month") or today_local()[:7])
+    if not re.match(r"^\d{4}-(0[1-9]|1[0-2])$", month):
+        raise S.ApiError(400, "Give the month as YYYY-MM.")
+    first = month + "-01"
+    y, m = int(month[:4]), int(month[5:7])
+    last_day = (datetime(y + (m == 12), (m % 12) + 1, 1) - timedelta(days=1)).day
+    last = "{}-{:02d}".format(month, last_day)
+
+    sql = ("SELECT on_date,t_start,t_end,title,status,advisor_name,requester_name,room_id"
+           " FROM bookings WHERE status IN ('approved','pending','forwarded')"
+           " AND on_date BETWEEN ? AND ?")
+    args = [first, last]
+    if room:
+        sql += " AND room_id=?"
+        args.append(room["id"])
+    days = {}
+    for r in S.q(sql + " ORDER BY t_start", tuple(args)).fetchall():
+        days.setdefault(r["on_date"], []).append(
+            {"start": r["t_start"], "end": r["t_end"], "status": r["status"],
+             "title": r["title"] if r["status"] == "approved" else "",
+             "by": (r["advisor_name"] or r["requester_name"] or "") if r["status"] == "approved" else ""})
+
+    today = today_local()
+    horizon = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=int(c["max_days_ahead"]))).strftime("%Y-%m-%d")
+    closed = {}
+    for d in range(1, last_day + 1):
+        date = "{}-{:02d}".format(month, d)
+        if date < today:
+            closed[date] = "past"
+        elif date > horizon:
+            closed[date] = "too far ahead"
+        else:
+            why = in_blackout(date)
+            if why:
+                closed[date] = why
+    return {"month": month, "first": first, "last": last, "days": days, "closed": closed,
+            "today": today, "horizon": horizon,
+            "day_start": c["day_start"], "day_end": c["day_end"],
+            "room": room_public(room) if room else None}
+
+
 def read_public_form(d):
     """Everything the form sends, checked. Raises a plain message on anything wrong."""
     out = read_request_body(d)
@@ -1495,6 +1546,7 @@ ROUTE_TABLE = [
     # open to everyone (the booking form on the website)
     ("GET",    r"/api/bookings/open/config",       api_open_config),
     ("GET",    r"/api/bookings/open/availability", api_open_availability),
+    ("GET",    r"/api/bookings/open/month",        api_open_month),
     ("POST",   r"/api/bookings/open/start",        api_open_start),
     ("POST",   r"/api/bookings/open/confirm",      api_open_confirm),
     ("GET",    r"/api/bookings/open/release",      api_open_release_info),

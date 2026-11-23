@@ -59,48 +59,88 @@
   };
   const addDays = (d, n) => { const t = new Date(d + 'T00:00:00'); t.setDate(t.getDate() + n); return t.toISOString().slice(0, 10); };
 
-  /* ---------------- the form ---------------- */
+  /* ---------------- time helpers ---------------- */
+  const mins = t => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const hhmm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const monthOf = d => d.slice(0, 7);
+  const shiftMonth = (ym, n) => {
+    let y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7)) - 1 + n;
+    y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+    return y + '-' + String(m + 1).padStart(2, '0');
+  };
+  const MIN_SLOT = 30;                       // a gap shorter than this is not worth offering
+
+  /* Free stretches of a day: the opening hours minus what is already confirmed. */
+  function freeGaps(booked, dayStart, dayEnd){
+    const taken = booked.filter(b => b.status === 'approved')
+                        .map(b => [mins(b.start), mins(b.end)])
+                        .sort((a, b) => a[0] - b[0]);
+    const gaps = [];
+    let at = mins(dayStart);
+    const end = mins(dayEnd);
+    for (const [s0, e0] of taken){
+      if (s0 - at >= MIN_SLOT) gaps.push([at, s0]);
+      at = Math.max(at, e0);
+    }
+    if (end - at >= MIN_SLOT) gaps.push([at, end]);
+    return gaps;
+  }
+
+  /* ---------------- the page ---------------- */
+  let SEL = {room: null, month: null, date: null, data: null};
+
   function drawForm(){
     const rooms = CFG.rooms;
+    SEL.room = SEL.room || rooms[0].id;
+    SEL.date = SEL.date || CFG.today;
+    SEL.month = monthOf(SEL.date);
+
     wrap.innerHTML =
       (CFG.register_ready ? '' :
         '<div class="rb-status is-warn">The department’s list of e-mail addresses has not been loaded yet, ' +
         'so the form cannot accept requests. Please contact the department office.</div>') +
+
+      '<section class="card rb-pick">' +
+        '<h3>1 &nbsp;Choose a room and a time</h3>' +
+        '<div class="rb-roomrow">' +
+          '<label><span class="lbl">Room</span><select id="rbRoom">' +
+            rooms.map(r => '<option value="' + r.id + '"' + (r.id === SEL.room ? ' selected' : '') + '>' +
+              esc(r.name) + (r.capacity ? ' — ' + r.capacity + ' seats' : '') + '</option>').join('') +
+          '</select></label>' +
+          '<p class="rb-roomnote" id="rbRoomNote"></p>' +
+        '</div>' +
+        '<div id="rbCal" class="rb-cal"><p class="hint">Loading the calendar…</p></div>' +
+        '<div id="rbDay" class="rb-day"></div>' +
+      '</section>' +
+
       '<form class="pform rb-form" id="rbForm" novalidate>' +
-        '<h3>Who is asking</h3>' +
+        '<h3>2 &nbsp;Who is asking</h3>' +
         '<div class="rb-grid">' +
           '<label><span class="lbl">Your name <b class="req">*</b></span><input name="name" required maxlength="120" autocomplete="name"></label>' +
           '<label><span class="lbl">Official e-mail <b class="req">*</b></span>' +
-            '<input type="email" name="email" required maxlength="160" autocomplete="email" ' +
-            'placeholder="name@iitkgp.ac.in">' +
+            '<input type="email" name="email" required maxlength="160" autocomplete="email" placeholder="name@iitkgp.ac.in">' +
             '<span class="field-note">The address the department has on record for you.</span></label>' +
           '<label><span class="lbl">Roll number</span>' +
             '<input name="roll" maxlength="40"><span class="field-note">Students and research scholars.</span></label>' +
-          '<label><span class="lbl">Phone <b class="req">*</b></span><input name="phone" required maxlength="40" ' +
-            'inputmode="tel" autocomplete="tel"></label>' +
+          '<label><span class="lbl">Phone <b class="req">*</b></span><input name="phone" required maxlength="40" inputmode="tel" autocomplete="tel"></label>' +
           '<label class="full"><span class="lbl">Supervisor, mentor or faculty advisor <b class="req">*</b></span>' +
-            '<select name="advisor_id">' +
-              '<option value="">— choose a faculty member —</option>' +
+            '<select name="advisor_id"><option value="">— choose a faculty member —</option>' +
               CFG.faculty.map(f => '<option value="' + esc(f.id) + '">' + esc(f.name) + '</option>').join('') +
             '</select>' +
             '<span class="field-note">Faculty members booking for themselves may choose their own name. ' +
             'This person is copied in on the e-mails.</span></label>' +
         '</div>' +
 
-        '<h3>The room</h3>' +
+        '<h3>3 &nbsp;When, and what for</h3>' +
         '<div class="rb-grid">' +
-          '<label><span class="lbl">Room <b class="req">*</b></span><select name="room_id" required>' +
-            rooms.map(r => '<option value="' + r.id + '">' + esc(r.name) +
-              (r.capacity ? ' — ' + r.capacity + ' seats' : '') + '</option>').join('') +
-          '</select><span class="field-note" id="rbRoomNote"></span></label>' +
           '<label><span class="lbl">Date <b class="req">*</b></span><input type="date" name="date" required ' +
-            'min="' + esc(CFG.today) + '" max="' + esc(addDays(CFG.today, CFG.max_days_ahead)) + '" ' +
-            'value="' + esc(CFG.today) + '"></label>' +
-          '<label><span class="lbl">People expected</span><input type="number" name="attendees" min="0" step="1"></label>' +
+            'min="' + esc(CFG.today) + '" max="' + esc(addDays(CFG.today, CFG.max_days_ahead)) + '" value="' + esc(SEL.date) + '"></label>' +
           '<label><span class="lbl">From <b class="req">*</b></span><input type="time" name="start" required value="10:00"></label>' +
           '<label><span class="lbl">To <b class="req">*</b></span><input type="time" name="end" required value="11:00"></label>' +
+          '<label><span class="lbl">People expected</span><input type="number" name="attendees" min="0" step="1"></label>' +
           '<label class="rb-spacer"><span class="lbl">&nbsp;</span><span class="field-note">Rooms can be booked between ' +
-            esc(CFG.day_start) + ' and ' + esc(CFG.day_end) + '.</span></label>' +
+            esc(CFG.day_start) + ' and ' + esc(CFG.day_end) + '. Pick a free slot above and these fill in for you.</span></label>' +
           '<label class="full"><span class="lbl">What is the room for? <b class="req">*</b></span>' +
             '<input name="title" required maxlength="160" placeholder="Seminar: Lattice-based cryptography">' +
             '<span class="field-note">This is what appears on the department calendar.</span></label>' +
@@ -110,53 +150,142 @@
             '<input name="needs" maxlength="400" placeholder="Projector, microphone, extra chairs"></label>' +
           '<label class="check"><input type="checkbox" name="outside"> An outside organisation or visitor group is involved</label>' +
         '</div>' +
-
-        '<div id="rbFree" class="rb-free" aria-live="polite"></div>' +
         '<div class="rb-actions"><button class="btn btn-maroon" type="submit">Send me a code</button></div>' +
       '</form>';
 
     const f = $('#rbForm').elements;
 
-    const roomNote = () => {
-      const r = rooms.find(x => String(x.id) === f.room_id.value) || {};
+    $('#rbRoom').addEventListener('change', e => {
+      SEL.room = Number(e.target.value); SEL.data = null; roomNote(); loadMonth();
+    });
+    f.date.addEventListener('change', () => {
+      if (!f.date.value) return;
+      SEL.date = f.date.value;
+      if (monthOf(SEL.date) !== SEL.month){ SEL.month = monthOf(SEL.date); loadMonth(); }
+      else { paintCal(); showDay(); }
+    });
+
+    function roomNote(){
+      const r = rooms.find(x => x.id === SEL.room) || {};
       $('#rbRoomNote').innerHTML = [r.location ? esc(r.location) : '', r.facilities ? esc(r.facilities) : '',
-        r.needs_hod ? 'Approved by the Head of the Department' : 'Confirmed by the department office'
+        r.custodian ? 'Key: ' + esc(r.custodian) : '',
+        r.needs_hod ? '<strong>Approved by the Head of the Department</strong>' : 'Confirmed by the department office'
       ].filter(Boolean).join(' · ');
-    };
+    }
+    roomNote();
 
-    const showFree = async () => {
-      const box = $('#rbFree');
-      if (!f.date.value){ box.innerHTML = ''; return; }
-      box.innerHTML = '<p class="hint">Checking what is free…</p>';
+    /* ----- the month grid ----- */
+    async function loadMonth(){
+      $('#rbCal').innerHTML = '<p class="hint">Loading the calendar…</p>';
       try {
-        const a = await api('GET', '/availability?date=' + encodeURIComponent(f.date.value) +
-                                   '&room=' + encodeURIComponent(f.room_id.value));
-        if (a.blackout){ box.innerHTML = '<p class="rb-warn">This date is blocked (' + esc(a.blackout) + ').</p>'; return; }
-        const taken = a.booked.filter(x => x.status === 'approved');
-        const waiting = a.booked.filter(x => x.status !== 'approved');
-        box.innerHTML = '<h4>' + esc(dayText(f.date.value)) + '</h4>' +
-          (taken.length
-            ? '<ul class="rb-slots">' + taken.map(x => '<li><strong>' + esc(x.start) + '–' + esc(x.end) + '</strong> ' +
-                esc(x.title) + (x.by ? ' <small>' + esc(x.by) + '</small>' : '') + '</li>').join('') + '</ul>'
-            : '<p class="hint">Nothing booked in this room on that day.</p>') +
-          (waiting.length ? '<p class="hint">Also asked for, not yet decided: ' +
-              waiting.map(x => esc(x.start) + '–' + esc(x.end)).join(', ') + '</p>' : '');
-      } catch (err){ box.innerHTML = err.offline ? '' : '<p class="hint">' + esc(err.message) + '</p>'; }
-    };
+        SEL.data = await api('GET', '/month?room=' + SEL.room + '&month=' + SEL.month);
+        paintCal(); showDay();
+      } catch (err){
+        if (err.offline) return offline();
+        $('#rbCal').innerHTML = '<p class="hint">' + esc(err.message) + '</p>';
+      }
+    }
 
-    f.room_id.addEventListener('change', () => { roomNote(); showFree(); });
-    f.date.addEventListener('change', showFree);
-    roomNote(); showFree();
+    function dayState(date){
+      const d = SEL.data;
+      if (d.closed[date]) return ['closed', d.closed[date]];
+      const list = d.days[date] || [];
+      const gaps = freeGaps(list, d.day_start, d.day_end);
+      if (!gaps.length) return ['full', 'Fully booked'];
+      if (list.some(x => x.status === 'approved')) return ['part', 'Part free'];
+      return ['free', 'Free'];
+    }
+
+    function paintCal(){
+      const d = SEL.data;
+      const y = Number(SEL.month.slice(0, 4)), m = Number(SEL.month.slice(5, 7)) - 1;
+      const firstDow = new Date(y, m, 1).getDay();
+      const total = new Date(y, m + 1, 0).getDate();
+      const canPrev = SEL.month > monthOf(CFG.today);
+      const canNext = SEL.month < monthOf(d.horizon);
+      let cells = '';
+      for (let i = 0; i < firstDow; i++) cells += '<span class="rb-pad"></span>';
+      for (let n = 1; n <= total; n++){
+        const date = SEL.month + '-' + String(n).padStart(2, '0');
+        const [state, label] = dayState(date);
+        const on = date === SEL.date;
+        cells += '<button type="button" class="rb-dy is-' + state + (on ? ' is-sel' : '') + '"' +
+          (state === 'closed' ? ' disabled' : '') + ' data-date="' + date + '" ' +
+          'title="' + esc(label) + '" aria-label="' + esc(date + ' — ' + label) + '">' +
+          '<span class="rb-dn">' + n + '</span><span class="rb-dm"></span></button>';
+      }
+      $('#rbCal').innerHTML =
+        '<div class="rb-calhead">' +
+          '<button type="button" class="rb-nav" id="rbPrev"' + (canPrev ? '' : ' disabled') + ' aria-label="Previous month">‹</button>' +
+          '<strong>' + MONTHS[m] + ' ' + y + '</strong>' +
+          '<button type="button" class="rb-nav" id="rbNext"' + (canNext ? '' : ' disabled') + ' aria-label="Next month">›</button>' +
+        '</div>' +
+        '<div class="rb-dow"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>' +
+        '<div class="rb-grid-days">' + cells + '</div>' +
+        '<div class="rb-legend"><span><i class="k-free"></i>Free</span><span><i class="k-part"></i>Partly booked</span>' +
+          '<span><i class="k-full"></i>Fully booked</span><span><i class="k-closed"></i>Not available</span></div>';
+
+      const prev = $('#rbPrev'), next = $('#rbNext');
+      if (prev) prev.addEventListener('click', () => { SEL.month = shiftMonth(SEL.month, -1); loadMonth(); });
+      if (next) next.addEventListener('click', () => { SEL.month = shiftMonth(SEL.month, 1); loadMonth(); });
+      wrap.querySelectorAll('.rb-dy').forEach(b => b.addEventListener('click', () => {
+        SEL.date = b.dataset.date;
+        f.date.value = SEL.date;
+        paintCal(); showDay();
+      }));
+    }
+
+    /* ----- the chosen day ----- */
+    function showDay(){
+      const d = SEL.data;
+      const box = $('#rbDay');
+      if (!d || monthOf(SEL.date) !== SEL.month){ box.innerHTML = ''; return; }
+      const closed = d.closed[SEL.date];
+      if (closed){
+        box.innerHTML = '<h4>' + esc(dayText(SEL.date)) + '</h4><p class="rb-warn">Not available (' + esc(closed) + ').</p>';
+        return;
+      }
+      const list = d.days[SEL.date] || [];
+      const booked = list.filter(x => x.status === 'approved');
+      const waiting = list.filter(x => x.status !== 'approved');
+      const gaps = freeGaps(list, d.day_start, d.day_end);
+      box.innerHTML = '<h4>' + esc(dayText(SEL.date)) + '</h4>' +
+        (booked.length
+          ? '<p class="rb-sub">Already booked</p><ul class="rb-slots">' + booked.map(x =>
+              '<li><strong>' + esc(x.start) + '–' + esc(x.end) + '</strong> ' + esc(x.title) +
+              (x.by ? ' <small>' + esc(x.by) + '</small>' : '') + '</li>').join('') + '</ul>'
+          : '<p class="hint">Nothing booked in this room on that day.</p>') +
+        (gaps.length
+          ? '<p class="rb-sub">Free — choose one to fill the form in</p><div class="rb-gaps">' +
+            gaps.map(g => '<button type="button" class="rb-gap" data-s="' + hhmm(g[0]) + '" data-e="' + hhmm(g[1]) + '">' +
+              hhmm(g[0]) + ' – ' + hhmm(g[1]) + '</button>').join('') + '</div>'
+          : '<p class="rb-warn">This room is fully booked that day.</p>') +
+        (waiting.length ? '<p class="hint">Also asked for, not yet decided: ' +
+            waiting.map(x => esc(x.start) + '–' + esc(x.end)).join(', ') + '</p>' : '');
+
+      wrap.querySelectorAll('.rb-gap').forEach(b => b.addEventListener('click', () => {
+        const s0 = mins(b.dataset.s), e0 = mins(b.dataset.e);
+        f.date.value = SEL.date;
+        f.start.value = b.dataset.s;
+        f.end.value = hhmm(Math.min(s0 + 60, e0));        // an hour by default; change it if you like
+        wrap.querySelectorAll('.rb-gap').forEach(x => x.classList.remove('is-on'));
+        b.classList.add('is-on');
+        f.name.focus({preventScroll: true});
+        document.querySelector('#rbForm').scrollIntoView({behavior: 'smooth', block: 'start'});
+      }));
+    }
+
+    loadMonth();
 
     $('#rbForm').addEventListener('submit', async ev => {
       ev.preventDefault();
       const body = {name: f.name.value.trim(), email: f.email.value.trim(), roll: f.roll.value.trim(),
                     phone: f.phone.value.trim(), advisor_id: f.advisor_id.value,
-                    room_id: Number(f.room_id.value), date: f.date.value, start: f.start.value, end: f.end.value,
+                    room_id: SEL.room, date: f.date.value, start: f.start.value, end: f.end.value,
                     title: f.title.value.trim(), purpose: f.purpose.value.trim(), needs: f.needs.value.trim(),
                     attendees: Number(f.attendees.value || 0), outside: f.outside.checked};
       for (const [k, label] of [['name', 'your name'], ['email', 'your e-mail address'],
-                                ['phone', 'a phone number'], ['title', 'what the room is for']]){
+                                ['phone', 'a phone number'], ['date', 'a date'], ['title', 'what the room is for']]){
         if (!body[k]){ say('Please give ' + label + '.', 'warn'); return; }
       }
       const btn = ev.target.querySelector('button[type=submit]');
