@@ -49,8 +49,8 @@ line and change it:
 ```
 
 * `id` — lower case with dashes, must be unique. It is the address of their profile page.
-* `type` — `faculty`, `adjunct`, `postdoc`, `scholar` or `staff`
-* `status` — `current`, `former` (moves to Former Faculty) or `alumni`
+* `type` — `faculty`, `adjunct`, `postdoc`, `project` (Project Fellows: JRF, SRF, RA; `supervisor` = the PI, `topic` = the project, `designation` = e.g. "Junior Research Fellow"), `scholar` or `staff`
+* `status` — `current`, `former` (moves to Former Faculty) or `alumni` (scholars and postdocs move to PhD & PDF Alumni)
 * `supervisor` — for scholars, the `id` of their supervisor. They then appear on
   that professor's Students tab automatically.
 

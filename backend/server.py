@@ -645,7 +645,7 @@ def notices_js():
 # ---------------------------------------------------------------------------
 PEOPLE_GROUPS = {
     "faculty": "Faculty", "adjunct": "Adjunct / INSPIRE faculty", "postdoc": "Postdoctoral fellows",
-    "scholar": "Research scholars", "staff": "Staff",
+    "project": "Project fellows", "scholar": "Research scholars", "staff": "Staff",
 }
 
 
@@ -824,7 +824,7 @@ def check_linkable(pid):
         raise ApiError(400, "Unknown profile.")
     if not can_self_edit(p):
         raise ApiError(400, "Portal accounts can't be linked to {} profiles – these are managed by the admin only.".format(
-            {"scholar": "research scholar"}.get(p.get("type"), p.get("type", "this kind of"))))
+            {"scholar": "research scholar", "project": "project fellow"}.get(p.get("type"), p.get("type", "this kind of"))))
 
 
 def require_user_with_editable_profile(req):
@@ -1277,7 +1277,7 @@ def api_update_person(req, pid):
 
 
 # ----- bulk import (JSON) -----
-PERSON_TYPES = {"faculty", "adjunct", "postdoc", "scholar", "staff"}
+PERSON_TYPES = {"faculty", "adjunct", "postdoc", "project", "scholar", "staff"}
 PERSON_STATUSES = {"current", "former", "alumni", "sample"}
 
 

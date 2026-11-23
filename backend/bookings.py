@@ -135,7 +135,7 @@ DEFAULTS = {
     "max_hours": 4,              # longest single booking the auto-rule will pass
     "max_days_ahead": 120,       # how far ahead anyone may book
     "buffer_min": 0,             # gap forced between two bookings of the same room
-    "requester_types": ["faculty", "adjunct", "postdoc", "scholar", "staff"],  # may book from inside the portal
+    "requester_types": ["faculty", "adjunct", "postdoc", "project", "scholar", "staff"],  # may book from inside the portal
     "auto_until": "",            # HoD: auto-approve only up to this date ("" = no limit)
     "tz_offset_min": 330,        # India Standard Time, for working out "today"
     "blackout": [],              # [{"from":"2026-12-24","to":"2027-01-01","reason":"Institute holidays"}]
@@ -1493,7 +1493,7 @@ def api_settings(req):
                         "reason": text(row.get("reason"), 120, "The reason")})
         changes["blackout"] = out
     if "requester_types" in d:
-        allowed = {"faculty", "adjunct", "postdoc", "scholar", "staff"}
+        allowed = {"faculty", "adjunct", "postdoc", "project", "scholar", "staff"}
         changes["requester_types"] = [t for t in (d.get("requester_types") or []) if t in allowed] or ["faculty"]
     if changes:
         save_cfg(changes)

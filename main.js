@@ -30,9 +30,10 @@ const pages = [
   {name:'People › Faculty',url:'people.html#faculty',words:'faculty professors members'},
   {name:'People › Adjunct & INSPIRE Faculty',url:'people.html#adjunct-faculty',words:'adjunct inspire faculty'},
   {name:'People › Postdoctoral Fellows',url:'people.html#postdoctoral-fellows',words:'postdoctoral fellows postdoc pdf'},
+  {name:'People › Project Fellows',url:'people.html#project-fellows',words:'project fellows jrf srf research associate project staff sponsored'},
   {name:'People › Research Scholars',url:'people.html#research-scholars',words:'research scholars phd students'},
   {name:'People › Administrative & Technical Staff',url:'people.html#staff',words:'staff office administrative technical'},
-  {name:'People › Alumni',url:'people.html#alumni',words:'alumni former students graduated phd postdoc'},
+  {name:'People › PhD & PDF Alumni',url:'people.html#alumni',words:'alumni former students graduated phd postdoc'},
   {name:'People › Former Faculty',url:'people.html#former-faculty',words:'former retired faculty'},
   {name:'Academics',url:'academics.html',words:'programmes courses undergraduate postgraduate doctoral admissions'},
   {name:'Academics › Programmes Overview',url:'academics.html#programmes',words:'programmes degrees overview'},
@@ -64,12 +65,12 @@ const pages = [
   const ALL = window.DEPT_PEOPLE || [];
   const AREAS = window.DEPT_AREAS || {};
   const LABEL = {faculty:'Faculty', adjunct:'Adjunct & INSPIRE Faculty', postdoc:'Postdoctoral Fellows',
-                 scholar:'Research Scholars', staff:'Staff'};
+                 project:'Project Fellows', scholar:'Research Scholars', staff:'Staff'};
   ALL.forEach(p=>{
     if(!p || !p.id || !p.name || p.status==='sample') return;
     let group = LABEL[p.type] || 'People';
     if(p.status==='former') group = 'Former Faculty';
-    else if(p.status==='alumni') group = 'Alumni';
+    else if(p.status==='alumni') group = 'PhD & PDF Alumni';
     const sup = p.supervisor && ALL.find(x=>x.id===p.supervisor);
     const words = [p.type, p.designation, p.grade, p.topic, p.roll, p.now, p.email,
                    p.head ? 'head of the department hod' : '',

@@ -411,7 +411,7 @@
       const desigFaculty = p.type === 'faculty';
       html += section('Administrative details (admin only)',
         '<div class="pgrid pgrid-3">' +
-          input(L('type', 'Type', 'select', {options: opts([['faculty', 'Faculty'], ['adjunct', 'Adjunct / INSPIRE'], ['postdoc', 'Postdoctoral fellow'], ['scholar', 'Research scholar'], ['staff', 'Staff']])}), p.type) +
+          input(L('type', 'Type', 'select', {options: opts([['faculty', 'Faculty'], ['adjunct', 'Adjunct / INSPIRE'], ['postdoc', 'Postdoctoral fellow'], ['project', 'Project fellow'], ['scholar', 'Research scholar'], ['staff', 'Staff']])}), p.type) +
           (desigFaculty ? input(L('designation', 'Designation', 'select', {blank: 1, options: opts([['professor', 'Professor'], ['associate-professor', 'Associate Professor'], ['assistant-professor', 'Assistant Professor']])}), p.designation)
                         : input(L('designation', 'Designation / position', 'text', {ph: 'e.g. NBHM Postdoctoral Fellow'}), p.designation)) +
           input(L('grade', 'Grade (optional)', 'text', {ph: 'Grade-I'}), p.grade) +
@@ -731,7 +731,7 @@
   };
 
   /* ---------------- admin: people ---------------- */
-  const TYPE_LABEL = {faculty: 'Faculty', adjunct: 'Adjunct', postdoc: 'Postdoc', scholar: 'Scholar', staff: 'Staff'};
+  const TYPE_LABEL = {faculty: 'Faculty', adjunct: 'Adjunct', postdoc: 'Postdoc', project: 'Project fellow', scholar: 'Scholar', staff: 'Staff'};
   const DESIG = {professor: 'Professor', 'associate-professor': 'Associate Prof.', 'assistant-professor': 'Assistant Prof.'};
   VIEWS.people = async function(){
     const d = await api('GET', '/admin/people');
@@ -754,7 +754,7 @@
     ['#pFilter', '#pType', '#pStatus'].forEach(s => $(s).addEventListener('input', filter));
     $('#newPerson').addEventListener('click', async () => {
       const name = prompt('Full name of the new person:'); if (!name) return;
-      const type = prompt('Type: faculty, adjunct, postdoc, scholar or staff', 'faculty'); if (!type) return;
+      const type = prompt('Type: faculty, adjunct, postdoc, project, scholar or staff', 'faculty'); if (!type) return;
       try {
         const r = await api('POST', '/admin/people', {profile: {name: name.trim(), type: type.trim().toLowerCase(), status: 'current'}});
         location.hash = 'person/' + r.profile.id;
@@ -986,7 +986,7 @@
       '• A record with <code>"list"</code> and <code>"email"</code> is added to that <a href="#lists">mailing list</a> (e.g. current M.Sc. students).<br>' +
       '• Any other record is a <b>profile</b>. If a profile with the same <code>id</code> already exists, the fields in the file are added to it; otherwise a new profile is created. ' +
       'The id is made from the name if you leave it out.<br>' +
-      '• Research scholars: <code>"type": "scholar"</code>, postdocs: <code>"postdoc"</code>. Graduated ones: <code>"status": "alumni"</code> with <code>"year"</code> = year completed – they appear under Alumni.<br>' +
+      '• Research scholars: <code>"type": "scholar"</code>, postdocs: <code>"postdoc"</code>, project fellows: <code>"project"</code>. Graduated ones: <code>"status": "alumni"</code> with <code>"year"</code> = year completed – they appear under Alumni.<br>' +
       '• <code>"supervisor"</code> must be the supervisor’s profile id (e.g. <code>ratna-dutta</code>) – it links the scholar to that professor’s Students tab.<br>' +
       '• Importing the same file twice does not create duplicates.<br>• Research scholars don’t get portal logins; update their profiles here or under People &amp; profiles.</p></div>';
     const form = $('#impForm');

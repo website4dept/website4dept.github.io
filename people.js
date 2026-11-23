@@ -22,7 +22,7 @@
   };
   const TYPE_LABELS = {
     faculty: 'Faculty', adjunct: 'Adjunct / INSPIRE Faculty', postdoc: 'Postdoctoral Fellow',
-    scholar: 'Ph.D. Scholar', staff: 'Staff'
+    project: 'Project Fellow', scholar: 'Ph.D. Scholar', staff: 'Staff'
   };
 
   function titleOf(p){
@@ -58,7 +58,7 @@
     if (t) meta += '<span class="person-title">' + esc(t) + '</span>';
     if (sup) meta += '<span class="person-meta">Supervisor: <a href="' + profileUrl(sup) + '">' + esc(sup.name) + '</a></span>';
     if (p.cosupervisor) meta += '<span class="person-meta">Co-supervisor: ' + esc(p.cosupervisor) + '</span>';
-    if (p.topic && (p.type === 'scholar' || p.type === 'postdoc')) meta += '<span class="person-meta person-topic">' + esc(p.topic) + '</span>';
+    if (p.topic && ['scholar', 'postdoc', 'project'].includes(p.type)) meta += '<span class="person-meta person-topic">' + esc(p.topic) + '</span>';
     if (p.status === 'alumni' && p.year) meta += '<span class="person-meta">Completed ' + esc(p.year) + '</span>';
     if (p.now) meta += '<span class="person-meta">Now: ' + esc(p.now) + '</span>';
     const pills = areaPills(p, 3);
@@ -105,8 +105,8 @@
       } else if (kind === 'alumni'){
         const list = PEOPLE.filter(p => ['scholar', 'postdoc'].includes(p.type) && p.status === 'alumni')
           .sort((a, b) => (String(b.year || '')).localeCompare(String(a.year || '')) || byName(a, b));
-        html += group('Ph.D. alumni', list.filter(p => p.type === 'scholar'));
-        html += group('Postdoctoral alumni', list.filter(p => p.type === 'postdoc'));
+        html += group('PhD alumni', list.filter(p => p.type === 'scholar'));
+        html += group('PDF alumni', list.filter(p => p.type === 'postdoc'));
       } else {
         html += group('', PEOPLE.filter(p => p.type === kind && p.status === 'current').sort(byName));
       }
@@ -118,22 +118,23 @@
     const SECS = [['faculty', 'Faculty', 'Professors, associate and assistant professors of the Department.'],
                   ['adjunct-faculty', 'Adjunct & INSPIRE', 'Adjunct and DST-INSPIRE faculty.'],
                   ['postdoctoral-fellows', 'Postdoctoral Fellows', 'Postdoctoral researchers working with our faculty.'],
+                  ['project-fellows', 'Project Fellows', 'Research fellows and associates on sponsored projects.'],
                   ['research-scholars', 'Research Scholars', 'Current Ph.D. scholars, listed with their supervisors.'],
                   ['staff', 'Staff', 'Administrative and technical staff of the Department.'],
                   ['former-faculty', 'Former Faculty', 'Faculty who have retired or moved on.'],
-                  ['alumni', 'Alumni', 'Ph.D. and postdoctoral alumni.']];
+                  ['alumni', 'PhD & PDF Alumni', 'Ph.D. and postdoctoral alumni.']];
     const catOf = p => {
       if (p.status === 'former' && ['faculty', 'adjunct', 'staff'].includes(p.type)) return 'former-faculty';
       if (p.status === 'alumni' && ['scholar', 'postdoc'].includes(p.type)) return 'alumni';
       if (p.status !== 'current') return '';
-      return {faculty: 'faculty', adjunct: 'adjunct-faculty', postdoc: 'postdoctoral-fellows', scholar: 'research-scholars', staff: 'staff'}[p.type] || '';
+      return {faculty: 'faculty', adjunct: 'adjunct-faculty', postdoc: 'postdoctoral-fellows', project: 'project-fellows', scholar: 'research-scholars', staff: 'staff'}[p.type] || '';
     };
     const counts = {};
     PEOPLE.forEach(p => { const c = catOf(p); if (c) counts[c] = (counts[c] || 0) + 1; });
     const label = id => (SECS.find(s => s[0] === id) || [])[1] || '';
     const secEls = SECS.map(s => document.getElementById(s[0])).filter(Boolean);
-    const hero = document.querySelector('main > .page-hero');
-    if (secEls.length && hero){
+    const toTop = () => window.scrollTo({top: 0, behavior: 'smooth'});
+    if (secEls.length){
       const bar = document.createElement('div');
       bar.className = 'content people-tabs-wrap';
       bar.innerHTML = '<div class="pill-row people-tabs" role="tablist" aria-label="People sections">' +
@@ -150,7 +151,7 @@
         '<div class="people-cards" id="peopleCards">' +
         SECS.map(s => '<a class="info-card people-card" href="#' + s[0] + '"><span class="people-count">' + (counts[s[0]] || 0) + '</span><h3>' + esc(s[1]) + '</h3><p>' + esc(s[2]) + '</p><span class="card-link">View →</span></a>').join('') +
         '</div></div>';
-      hero.insertAdjacentElement('afterend', ov);
+      secEls[0].insertAdjacentElement('beforebegin', ov);
       ov.insertAdjacentElement('beforebegin', bar);
 
       const supName = p => { const s = p.supervisor && findPerson(p.supervisor); return s ? s.name : ''; };
@@ -191,9 +192,9 @@
         const a = e.target.closest('a[href^="#"]'); if (!a || !(bar.contains(a) || ov.contains(a))) return;
         const id = a.getAttribute('href').slice(1); if (id !== 'overview' && !SECS.some(s => s[0] === id)) return;
         e.preventDefault(); history.pushState(null, '', '#' + id); show('#' + id);
-        window.scrollTo({top: Math.max(0, (hero.offsetTop + hero.offsetHeight) - 70), behavior: 'smooth'});
+        toTop();
       });
-      window.addEventListener('hashchange', () => { show(location.hash); window.scrollTo({top: Math.max(0, (hero.offsetTop + hero.offsetHeight) - 70), behavior: 'smooth'}); });
+      window.addEventListener('hashchange', () => { show(location.hash); toTop(); });
       window.addEventListener('popstate', () => show(location.hash));
       const first = show(location.hash);
       const t = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
@@ -323,24 +324,25 @@
     }
 
     /* ----- research scholars: short profile (supervisor, email, area, roll no., office) ----- */
-    if (p.type === 'scholar'){
+    if (p.type === 'scholar' || p.type === 'project'){
+      const pf = p.type === 'project';
       const sv = p.supervisor && findPerson(p.supervisor);
       const row = (k, v) => '<li><span>' + k + '</span>' + v + '</li>';
       const area = areaPills(p) || (p.topic ? esc(p.topic) : '');
       const r = [];
-      r.push(row('Supervisor', sv ? '<a href="' + profileUrl(sv) + '">' + esc(sv.name) + '</a>' : '—'));
+      r.push(row(pf ? 'Principal investigator' : 'Supervisor', sv ? '<a href="' + profileUrl(sv) + '">' + esc(sv.name) + '</a>' : '—'));
       if (p.cosupervisor) r.push(row('Co-supervisor', esc(p.cosupervisor)));
       r.push(row('Official email', p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '—'));
-      r.push(row('Research area', p.topic ? esc(p.topic) : (area || '—')));
-      r.push(row('Roll no.', p.roll ? esc(p.roll) : '—'));
+      r.push(row(pf ? 'Project' : 'Research area', p.topic ? esc(p.topic) : (area || '—')));
+      if (!pf || p.roll) r.push(row('Roll no.', p.roll ? esc(p.roll) : '—'));
       r.push(row('Office address', p.office ? esc(p.office) : '—'));
       head.innerHTML =
         '<div class="profile-head-grid">' + photoHTML(p, 'profile-photo') +
-          '<div><div class="eyebrow">Research Scholar</div><h2>' + esc(p.name) + '</h2>' +
-          '<p class="profile-title">Ph.D. Scholar, Department of Mathematics</p></div></div>';
+          '<div><div class="eyebrow">' + (pf ? 'Project Fellow' : 'Research Scholar') + '</div><h2>' + esc(p.name) + '</h2>' +
+          '<p class="profile-title">' + (pf ? esc(p.designation || 'Project Fellow') : 'Ph.D. Scholar') + ', Department of Mathematics</p></div></div>';
       body.innerHTML =
         '<div class="profile-layout"><div class="profile-main"><div class="surface">' +
-          '<h3>Scholar details</h3><ul class="profile-contact scholar-simple">' + r.join('') + '</ul></div>' +
+          '<h3>' + (pf ? 'Fellow details' : 'Scholar details') + '</h3><ul class="profile-contact scholar-simple">' + r.join('') + '</ul></div>' +
           '<p class="profile-back"><a class="link-arrow" href="people.html#' + esc(p.id) + '">← Back to people directory</a></p></div></div>';
       return;
     }
@@ -379,7 +381,7 @@
     if (p.website) rows.push('<li><span>Website</span>' + link(p.website, 'Personal page ↗') + '</li>');
     if (p.profile) rows.push('<li><span>Institute</span>' + link(p.profile, 'IIT KGP profile ↗') + '</li>');
     const sup = p.supervisor && findPerson(p.supervisor);
-    if (sup) rows.push('<li><span>' + (p.type === 'postdoc' ? 'Mentor' : 'Supervisor') + '</span><a href="' + profileUrl(sup) + '">' + esc(sup.name) + '</a></li>');
+    if (sup) rows.push('<li><span>' + (p.type === 'postdoc' ? 'Mentor' : p.type === 'project' ? 'Principal investigator' : 'Supervisor') + '</span><a href="' + profileUrl(sup) + '">' + esc(sup.name) + '</a></li>');
     if (p.cosupervisor) rows.push('<li><span>Co-supervisor</span>' + esc(p.cosupervisor) + '</li>');
     if (p.topic && !(p.areas || []).length) rows.push('<li><span>Research topic</span>' + esc(p.topic) + '</li>');
     if (p.year && p.status === 'current') rows.push('<li><span>Joined</span>' + esc(p.year) + '</li>');
