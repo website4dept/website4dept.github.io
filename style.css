@@ -312,13 +312,26 @@ footer{background:#0d2028;color:#fff}
 .search-results a{display:block;background:#fff;border-bottom:1px solid var(--line);padding:10px 14px;font-size:14px}
 .search-results a:hover{color:var(--maroon)}
 .search-results p{font-size:13px;color:var(--muted);padding:10px 0}
-.page-hero{background:linear-gradient(105deg,var(--maroon-dark),var(--maroon) 62%,#813443);color:#fff;padding:72px 0 76px;position:relative;overflow:hidden}
-.page-hero:after{content:"∫  ∑  π  ∞  ∇";font:700 70px "Source Serif 4",Georgia,serif;color:rgba(255,255,255,.045);position:absolute;right:0;bottom:-12px;white-space:nowrap;letter-spacing:14px;pointer-events:none}
-.breadcrumbs{display:flex;gap:10px;align-items:center;font-size:12px;color:#f1d3d6;margin-bottom:26px}
+/* ---- Page heading band -----------------------------------------------------
+   Light band on white.  The maroon strip that used to sit here was removed on
+   2026-11-24 so every tab and subtab opens the way research.html does.  Only
+   the home page (.hero, further down) and faculty profiles (.profile-hero,
+   just below) still use a dark band.                                        */
+.page-hero{background:#fff;color:var(--ink);padding:56px 0 4px;position:relative;overflow:visible}
+.breadcrumbs{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted);margin-bottom:24px}
+.breadcrumbs a{color:var(--maroon);font-weight:600}
 .breadcrumbs a:hover{text-decoration:underline}
-.page-hero .eyebrow{color:#f2cc82;margin-bottom:15px}
-.page-hero h2{font:700 clamp(37px,4vw,58px)/1.16 "Source Serif 4",Georgia,serif;letter-spacing:-.025em;margin-bottom:16px;max-width:860px}
-.page-hero p{font-size:16px;max-width:740px;color:rgba(255,255,255,.82)}
+.page-hero .eyebrow{margin-bottom:13px}
+.page-hero h2{font:700 clamp(34px,3.6vw,50px)/1.16 "Source Serif 4",Georgia,serif;letter-spacing:-.02em;margin-bottom:14px;max-width:880px;color:var(--ink)}
+.page-hero p{font-size:16px;max-width:740px;color:var(--muted)}
+/* ---- Faculty profile header keeps the dark card (a photo sits inside it) -- */
+.page-hero.profile-hero{background:linear-gradient(105deg,var(--maroon-dark),var(--maroon) 62%,#813443);color:#fff;overflow:hidden}
+.page-hero.profile-hero:after{content:"∫  ∑  π  ∞  ∇";font:700 70px "Source Serif 4",Georgia,serif;color:rgba(255,255,255,.045);position:absolute;right:0;bottom:-12px;white-space:nowrap;letter-spacing:14px;pointer-events:none}
+.profile-hero .breadcrumbs{color:#f1d3d6}
+.profile-hero .breadcrumbs a{color:#f7e6e8;font-weight:600}
+.profile-hero .eyebrow{color:#f2cc82}
+.profile-hero h2{color:#fff}
+.profile-hero p{color:rgba(255,255,255,.82)}
 .page-section{padding:78px 0}
 .page-section.soft{background:var(--cream)}
 .page-section.blue-soft{background:var(--blue-soft)}
@@ -369,7 +382,7 @@ footer{background:#0d2028;color:#fff}
 /* Keep everything functional when printed */
 @media print{.utility-bar,.navbar,.header-actions,.search-drawer,.mobile-menu{display:none!important}.page-hero{padding:35px 0}.page-section{padding:30px 0}a{text-decoration:underline}}
 @media(max-width:1000px){.two-col{grid-template-columns:1fr;gap:28px}.three-col{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:700px){.three-col,.two-cards,.contact-grid{grid-template-columns:1fr}.page-hero{padding:52px 0}.page-section{padding:53px 0}.page-hero:after{font-size:40px}.surface{padding:23px}.info-card{padding:24px}.row-list .row-entry{align-items:start;flex-direction:column;gap:9px}.search-box{flex-wrap:wrap}.search-box input{min-width:180px}}
+@media(max-width:700px){.three-col,.two-cards,.contact-grid{grid-template-columns:1fr}.page-hero{padding:38px 0 2px}.page-section{padding:53px 0}.profile-hero:after{font-size:40px}.surface{padding:23px}.info-card{padding:24px}.row-list .row-entry{align-items:start;flex-direction:column;gap:9px}.search-box{flex-wrap:wrap}.search-box input{min-width:180px}}
 
 
 
@@ -1005,18 +1018,14 @@ a.soc:hover{background:var(--gold);border-color:var(--gold);color:#281c0e}
    ===================================================================== */
 body{font-size:16.5px;letter-spacing:.005em}
 h1,h2,h3,h4{font-weight:700}
-.page-hero{box-sizing:border-box;height:400px;padding:58px 0 0;display:flex;flex-direction:column;justify-content:flex-start}
+.page-hero{box-sizing:border-box;height:auto;padding:56px 0 4px}
 .page-hero .breadcrumbs{margin-bottom:22px}
-.page-hero h2{font-size:clamp(34px,3.5vw,50px);line-height:1.18;letter-spacing:-.01em;max-width:980px;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.page-hero p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-width:780px}
-.page-hero.profile-hero{height:auto;min-height:400px;padding-bottom:50px}
-.page-hero.profile-hero h2,.page-hero.profile-hero p{display:block;-webkit-line-clamp:unset;overflow:visible}
+.page-hero h2{font-size:clamp(32px,3.4vw,48px);line-height:1.18;letter-spacing:-.015em;max-width:980px}
+.page-hero p{max-width:780px}
+.page-hero.profile-hero{height:auto;min-height:400px;padding:58px 0 50px;display:flex;flex-direction:column;justify-content:flex-start}
 @media(max-width:700px){
-  .page-hero{height:470px;padding:40px 0 0}
-  .page-hero h2{-webkit-line-clamp:4}
-  .page-hero p{-webkit-line-clamp:6}
-  .page-hero.profile-hero{height:auto;min-height:470px}
+  .page-hero{height:auto;padding:38px 0 2px}
+  .page-hero.profile-hero{height:auto;min-height:470px;padding:40px 0 40px}
 }
 
 /* =====================================================================
@@ -1368,3 +1377,7 @@ h1,h2,h3,h4{font-weight:700}
   .rb-dow,.rb-grid-days{gap:4px}
   .rb-legend{gap:10px;font-size:11.5px}
 }
+
+/* a command the reader is meant to copy (deploy pages, portal-down page) */
+.code-block{background:#1f2326;color:#eef1f2;padding:14px 18px;overflow-x:auto;font:14px/1.6 ui-monospace,
+  SFMono-Regular,Menlo,Consolas,monospace;margin:0 0 20px;border-left:4px solid var(--gold)}

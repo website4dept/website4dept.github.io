@@ -23,8 +23,62 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const STATE_CLASS = {approved: 'st-active', pending: 'st-pending', forwarded: 'st-pending',
                        returned: 'st-pending', rejected: 'st-disabled', cancelled: 'st-disabled'};
-  const chip = b => '<span class="pill-status ' + (STATE_CLASS[b.status] || '') + '">' + esc(b.status_label) +
-                    (b.auto ? ' · auto' : '') + '</span>';
+  const chip = b => '<span class="pill-status ' +
+                    (b.awaiting_office ? 'st-pending' : (STATE_CLASS[b.status] || '')) + '">' +
+                    esc(b.status_label) + (b.auto ? ' · auto' : '') + '</span>';
+
+  /* The office checklist, shown before a request is forwarded or confirmed.
+     Everything in it is checked again on the server, so a stale page cannot
+     wave anything through. */
+  const MARK = {ok: '✓', warn: '!', stop: '✕'};
+  async function checkPanel(id, next, after){
+    const {api, $, toast} = ready();
+    const box = $('#bkCheckBox');
+    if (!box) return;
+    box.innerHTML = '<div class="card bk-check"><p class="hint">Checking…</p></div>';
+    box.scrollIntoView({block: 'nearest'});
+    let d;
+    try { d = await api('GET', '/bookings/' + id + '/check'); }
+    catch (err){ box.innerHTML = ''; return toast(err.message, true); }
+    const b = d.booking;
+    const label = next === 'forward' ? 'Forward to the Head' : 'Confirm booking';
+    box.innerHTML =
+      '<div class="card bk-check"><h3>Before you ' +
+        (next === 'forward' ? 'forward' : 'confirm') + ': ' + esc(b.ref) + '</h3>' +
+      '<p class="hint"><strong>' + esc(b.room) + '</strong> · ' + when(b) + ' · ' +
+        esc(b.title) + ' · asked by ' + esc(b.by) + '</p>' +
+      '<ul class="bk-checklist">' + d.checks.map(c =>
+        '<li class="is-' + c.level + '"><span class="bk-mark">' + MARK[c.level] + '</span>' +
+        '<span><strong>' + esc(c.what) + '</strong>' +
+        (c.detail ? '<small>' + esc(c.detail) + '</small>' : '') + '</span></li>').join('') + '</ul>' +
+      (next === 'forward' && d.auto && d.auto.ok
+        ? '<p class="hint">The Head’s standing approval covers this one, so forwarding approves it ' +
+          'at once' + (d.office_auto_confirm ? ' and it goes straight out to the person who asked.'
+                                             : ' and it then waits here for you to confirm.') + '</p>'
+        : '') +
+      (d.stop
+        ? '<p class="bk-warn">This cannot go forward as it stands. Send it back for correction, or refuse it.</p>'
+        : '') +
+      '<div class="view-actions">' +
+        (d.stop ? '' : '<button class="btn btn-maroon" data-go="' + id + '" data-next="' + next + '">' +
+                       label + '</button>') +
+        '<button class="btn btn-light" id="bkCheckClose">Close</button></div></div>';
+    $('#bkCheckClose').addEventListener('click', () => { box.innerHTML = ''; });
+    const go = box.querySelector('[data-go]');
+    if (go) go.addEventListener('click', async () => {
+      go.disabled = true;
+      try {
+        const r = await api('POST', '/bookings/' + id + '/office', {action: next, note: ''});
+        toast(r.confirmed ? 'Confirmed. The e-mail has gone to the person who asked'
+                            + (b.supervisor ? ', with a copy to ' + b.supervisor + ' and the office.' : ' and the office.')
+            : r.status === 'approved' ? 'Approved under the Head’s standing approval. It is now in '
+                                        + '“Ready to confirm” — nothing has been sent yet.'
+            : 'Forwarded to the Head of the Department.');
+        box.innerHTML = '';
+        after();
+      } catch (err){ go.disabled = false; toast(err.message, true); }
+    });
+  }
   const when = b => esc(dayText(b.date)) + ', ' + esc(b.start) + '–' + esc(b.end);
   const slot = b => esc(b.start) + '–' + esc(b.end);
 
@@ -203,10 +257,10 @@
         (b.competing.length ? '<br><small>also asked: ' + esc(b.competing.join('; ')) + '</small>' : '') + '</td>' +
       '<td class="actions">' +
         (b.status === 'forwarded'
-          ? '<small class="bk-withhod">with the Head</small>'
-          : (b.needs_hod
-              ? '<button class="btn btn-maroon btn-sm" data-act="forward" data-id="' + b.id + '">Forward to HoD</button>'
-              : '<button class="btn btn-maroon btn-sm" data-act="confirm" data-id="' + b.id + '">Confirm</button>')) +
+          ? '<small class="bk-withhod">with the Head — his approval is still pending</small>'
+          : '<button class="btn btn-maroon btn-sm" data-check="' + b.id + '" data-next="' +
+            (b.needs_hod ? 'forward' : 'confirm') + '">Check &amp; ' +
+            (b.needs_hod ? 'forward' : 'confirm') + '</button>') +
         '<button class="btn btn-light btn-sm" data-act="return" data-id="' + b.id + '">Return</button>' +
         '<button class="btn btn-danger btn-sm" data-act="reject" data-id="' + b.id + '">Reject</button>' +
       '</td></tr>';
@@ -220,21 +274,52 @@
     const empty = !d.register
       ? '<div class="portal-alert">No e-mail addresses have been imported yet, so nobody can use the ' +
         'booking form on the website. Admin → Import data (JSON).</div>' : '';
+    const confirmRow = b =>
+      '<tr' + (b.conflict ? ' class="bk-conflict"' : '') + '><td>' + when(b) +
+        '<br><small>' + esc(b.ref) + '</small></td>' +
+      '<td>' + esc(b.room) + '</td>' +
+      '<td><strong>' + esc(b.title) + '</strong>' +
+        (b.needs ? '<br><small>Needs: ' + esc(b.needs) + '</small>' : '') + '</td>' +
+      '<td>' + esc(b.by) + '<br><small>' + esc(b.email || '') + '</small>' +
+        (b.supervisor ? '<br><small>Advisor: ' + esc(b.supervisor) + '</small>' : '') + '</td>' +
+      '<td>' + (b.auto ? 'Standing approval' : 'Approved by the Head') +
+        (b.note ? '<br><small>' + esc(b.note) + '</small>' : '') +
+        (b.conflict ? '<br><small class="bk-warn">clashes with another confirmed booking</small>' : '') +
+        (b.past ? '<br><small class="bk-warn">that date has passed</small>' : '') + '</td>' +
+      '<td class="actions">' +
+        '<button class="btn btn-maroon btn-sm" data-check="' + b.id + '" data-next="confirm">Check &amp; confirm</button>' +
+        '<button class="btn btn-danger btn-sm" data-revoke="' + b.id + '">Withdraw</button></td></tr>';
+
     $('#view').innerHTML = head('Booking requests',
-        'Every room request lands here first. Check it, then forward a seminar hall to the Head ' +
-        'of the Department or confirm a classroom yourself. The Head is only e-mailed once you ' +
-        'forward. You can also send a request back for correction, or refuse it.') +
+        'Every room request lands here first. Check the details and that the room is really free, ' +
+        'then forward a seminar hall to the Head of the Department or confirm a classroom yourself. ' +
+        'The Head is only e-mailed once you forward. When he approves, the booking comes back to you ' +
+        'in “Ready to confirm” — nothing reaches the person who asked until you confirm it.') +
       empty + warn +
       '<div class="stat-grid">' +
         '<div class="stat-card"><strong>' + c.pending + '</strong><span>waiting for you</span></div>' +
-        '<div class="stat-card"><strong>' + c.forwarded + '</strong><span>with the Head</span></div>' +
+        '<div class="stat-card"><strong>' + c.forwarded + '</strong><span>with the Head, not yet approved</span></div>' +
+        '<div class="stat-card' + (c.to_confirm ? ' is-urgent' : '') + '"><strong>' + c.to_confirm +
+          '</strong><span>approved — ready for you to confirm</span></div>' +
         '<div class="stat-card"><strong>' + c.returned + '</strong><span>sent back for correction</span></div>' +
         '<div class="stat-card"><strong>' + d.upcoming.length + '</strong><span>confirmed, still to come</span></div>' +
       '</div>' +
+      '<div id="bkCheckBox"></div>' +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th><th>Purpose</th>' +
         '<th>Asked by</th><th>State</th><th></th></tr></thead><tbody>' +
         (d.queue.length ? d.queue.map(row).join('') : '<tr><td colspan="6"><small>Nothing waiting. </small></td></tr>') +
         '</tbody></table></div>' +
+      '<h3 class="bk-h3">Ready to confirm <small>(the Head has approved — nothing sent yet)</small></h3>' +
+      '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th><th>Purpose</th>' +
+        '<th>Asked by</th><th>Approved</th><th></th></tr></thead><tbody>' +
+        (d.to_confirm.length ? d.to_confirm.map(confirmRow).join('')
+          : '<tr><td colspan="6"><small>Nothing is waiting to be confirmed.</small></td></tr>') +
+        '</tbody></table></div>' +
+      '<div class="card bk-switch"><label class="check"><input type="checkbox" id="bkAutoConfirm"' +
+        (d.office_auto_confirm ? ' checked' : '') + '> ' +
+        '<span><strong>Confirm as soon as the Head approves</strong>' +
+        '<small>With this on, an approval goes straight out to the person who asked and nothing waits here. ' +
+        'With it off (the usual setting) every approval comes back to you first.</small></span></label></div>' +
       '<h3 class="bk-h3">Confirmed bookings still to come</h3>' +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th><th>Purpose</th>' +
         '<th>Booked by</th><th></th></tr></thead><tbody>' +
@@ -249,6 +334,18 @@
           : '<tr><td colspan="5"><small>Nothing confirmed yet.</small></td></tr>') +
         '</tbody></table></div>';
 
+    $$('[data-check]').forEach(btn => btn.addEventListener('click',
+      () => checkPanel(Number(btn.dataset.check), btn.dataset.next, viewQueue)));
+
+    const sw = $('#bkAutoConfirm');
+    if (sw) sw.addEventListener('change', async () => {
+      try {
+        await api('PUT', '/bookings/settings', {office_auto_confirm: sw.checked});
+        toast(sw.checked ? 'Bookings will now be confirmed the moment the Head approves.'
+                         : 'Approvals will wait here for you to confirm.');
+      } catch (err){ sw.checked = !sw.checked; toast(err.message, true); }
+    });
+
     $$('[data-act]').forEach(btn => btn.addEventListener('click', async () => {
       const act = btn.dataset.act;
       let note = '';
@@ -256,7 +353,8 @@
       if (act === 'reject') { note = askNote('Why is it refused? This is e-mailed to them.', true); if (note === null) return; }
       try {
         const r = await api('POST', '/bookings/' + btn.dataset.id + '/office', {action: act, note: note});
-        toast(r.status === 'approved' ? (r.auto ? 'Approved automatically under the Head’s standing approval.' : 'Confirmed.')
+        toast(r.status === 'approved' ? (r.confirmed ? 'Confirmed and e-mailed.'
+                                                     : 'Approved — now in “Ready to confirm”.')
             : r.status === 'forwarded' ? 'Forwarded to the Head of the Department.'
             : r.status === 'returned' ? 'Sent back for correction.' : 'Rejected.');
         viewQueue();
@@ -311,6 +409,8 @@
           ? '<ul class="td-list">' + list.map(b =>
               '<li' + (b.no_show ? ' class="is-noshow"' : '') + '><span class="td-time">' + esc(b.start) + '–' + esc(b.end) + '</span>' +
               '<span class="td-what"><strong>' + esc(b.title) + '</strong>' +
+                (b.confirmed === false ? '<small class="bk-warn">not confirmed yet — the room is held but ' +
+                  'nobody has been told</small>' : '') +
                 (b.needs ? '<small>Needs: ' + esc(b.needs) + '</small>' : '') + '</span>' +
               '<span class="td-who">' + esc(b.by || '') +
                 (b.phone ? '<small>☎ ' + esc(b.phone) + '</small>' : '') + '</span>' +
@@ -371,10 +471,21 @@
         '<button class="btn btn-maroon btn-sm" data-decide="approve" data-id="' + b.id + '">Approve</button>' +
         '<button class="btn btn-danger btn-sm" data-decide="reject" data-id="' + b.id + '">Reject</button></td></tr>';
 
+    const dayBtns = (d.days || []).length
+      ? '<div class="bk-days"><span>Clear a whole day:</span>' + d.days.map(x =>
+          '<button class="btn btn-light btn-sm" data-day-approve="' + esc(x.date) + '">' +
+          esc(x.pretty) + ' (' + x.count + ')</button>').join('') + '</div>'
+      : '';
+
     $('#view').innerHTML = head('Approvals',
         'Room requests the department office has checked and forwarded to you. Classrooms are ' +
-        'confirmed by the office and do not appear here. Tick several and use “Approve selected” ' +
-        'to clear them in one go.') +
+        'confirmed by the office and do not appear here. Tick several and use “Approve selected”, ' +
+        'or clear a whole day in one click. ' +
+        (d.office_auto_confirm
+          ? 'The office has asked for bookings to go out the moment you approve them.'
+          : 'Your approval does not send anything on its own: the office confirms it afterwards, ' +
+            'and that is what tells the person who asked. The list below shows what is still with them.')) +
+      dayBtns +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th><input type="checkbox" id="bkAll" aria-label="Select all"></th>' +
         '<th>Date &amp; time</th><th>Room</th><th>Purpose</th><th>Asked by</th><th></th></tr></thead><tbody>' +
         (d.waiting.length ? d.waiting.map(row).join('')
@@ -383,9 +494,20 @@
       (d.waiting.length ? '<div class="view-actions"><button class="btn btn-maroon" id="bkMany">Approve selected</button>' +
         '<button class="btn btn-light" id="bkManyNo">Reject selected</button></div>' : '') +
 
+      '<h3 class="bk-h3">Approved by you — waiting for the office to confirm</h3>' +
+      '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th>' +
+        '<th>Purpose</th><th>Asked by</th><th>State</th></tr></thead><tbody>' +
+        ((d.awaiting_office || []).length
+          ? d.awaiting_office.map(b => '<tr><td>' + when(b) + '<br><small>' + esc(b.ref) + '</small></td>' +
+              '<td>' + esc(b.room) + '</td><td>' + esc(b.title) + '</td><td>' + esc(b.by) + '</td>' +
+              '<td>' + chip(b) + (b.auto ? '<br><small>standing approval</small>' : '') + '</td></tr>').join('')
+          : '<tr><td colspan="5"><small>The office has confirmed everything you have approved.</small></td></tr>') +
+        '</tbody></table></div>' +
+
       '<div class="card bk-auto"><h3>Standing approval</h3>' +
-        '<p class="hint">Tick a room and <strong>routine</strong> requests for it are approved as soon as ' +
-        'they are made, without waiting for you. Anything unusual still comes here: an outside organisation, longer than ' +
+        '<p class="hint">Tick a room and <strong>routine</strong> requests for it are approved the moment ' +
+        'the office checks them, without waiting for you. The office still confirms them afterwards. ' +
+        'Anything unusual comes here instead: an outside organisation, longer than ' +
         d.max_hours + ' hours, more people than the room holds, or a clash. Every automatic approval is ' +
         'listed below and you can withdraw it.</p>' +
         '<form class="pform" id="bkAutoForm"><div class="pgrid pgrid-3">' +
@@ -416,8 +538,11 @@
       const act = btn.dataset.decide;
       let note = '';
       if (act === 'reject'){ note = askNote('Why is it refused? This is e-mailed to them.', true); if (note === null) return; }
-      try { await api('POST', '/bookings/' + btn.dataset.id + '/decide', {action: act, note: note});
-            toast(act === 'approve' ? 'Approved. The faculty member has been e-mailed.' : 'Rejected.'); viewApprovals(); }
+      try { const r = await api('POST', '/bookings/' + btn.dataset.id + '/decide', {action: act, note: note});
+            toast(act !== 'approve' ? 'Rejected.'
+                : r.confirmed ? 'Approved and sent out.'
+                : 'Approved. The office will confirm it — nothing has been sent yet.');
+            viewApprovals(); }
       catch (err){ toast(err.message, true); }
     }));
 
@@ -436,6 +561,19 @@
     };
     if ($('#bkMany')) $('#bkMany').addEventListener('click', () => many('approve'));
     if ($('#bkManyNo')) $('#bkManyNo').addEventListener('click', () => many('reject'));
+
+    $$('[data-day-approve]').forEach(btn => btn.addEventListener('click', async () => {
+      const day = btn.dataset.dayApprove;
+      if (!confirm('Approve everything waiting for ' + btn.textContent.trim() + '?')) return;
+      try {
+        const r = await api('POST', '/bookings/decide-many', {date: day, action: 'approve', note: ''});
+        toast(r.done + ' approved' +
+              (r.failed.length ? ', ' + r.failed.length + ' could not be (clash or already decided)' : '') +
+              (d.office_auto_confirm ? ' and sent out.' : '. The office will confirm them.'),
+              r.failed.length > 0);
+        viewApprovals();
+      } catch (err){ toast(err.message, true); }
+    }));
 
     $('#bkAutoForm').addEventListener('submit', async ev => {
       ev.preventDefault();

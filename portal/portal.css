@@ -170,6 +170,32 @@ tr.bk-conflict td{background:#fdf3f3}
 .bk-src{color:#5b6b73;font-style:italic}
 .bk-withhod{display:block;color:#5b6b73;margin:2px 0 4px}
 
+/* The office checklist shown before forwarding or confirming */
+.bk-check{border-left:4px solid var(--maroon,#7a1a1a)}
+.bk-check h3{margin:0 0 6px;font-family:"Source Serif 4",Georgia,serif;font-size:19px}
+.bk-checklist{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:2px}
+.bk-checklist li{display:flex;gap:12px;align-items:flex-start;padding:9px 12px;background:#f8fafb;
+  border-left:3px solid #cfd8dc}
+.bk-checklist li.is-warn{background:#fdf9ee;border-left-color:#c79a28}
+.bk-checklist li.is-stop{background:#fdf3f3;border-left-color:#9c2020}
+.bk-checklist .bk-mark{font-weight:800;width:16px;text-align:center;color:#3e7d53}
+.bk-checklist li.is-warn .bk-mark{color:#8a6a12}
+.bk-checklist li.is-stop .bk-mark{color:#9c2020}
+.bk-checklist li small{display:block;color:#5b6b73;font-size:13px;margin-top:2px;word-break:break-word}
+
+/* "Confirm as soon as the Head approves" */
+.bk-switch{margin-top:8px}
+.bk-switch label.check{display:flex;gap:11px;align-items:flex-start;margin:0}
+.bk-switch label.check input[type=checkbox]{width:auto;flex:0 0 auto;margin-top:3px}
+.bk-switch small{display:block;color:#5b6b73;font-size:13px;margin-top:3px;font-weight:400}
+
+/* "Clear a whole day" buttons on the Head's page */
+.bk-days{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 18px}
+.bk-days span{font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#5b6b73}
+
+/* a counter that is asking to be acted on */
+.stat-card.is-urgent{border-top-color:#c79a28;background:#fdfaf2}
+
 /* Today's sheet — made to be printed and pinned up */
 .td-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
 .td-bar input[type=date]{font:inherit;padding:7px 10px;border:1px solid #cfd8dc}
@@ -202,3 +228,19 @@ tr.bk-conflict td{background:#fdf3f3}
 .auth-card-wide{width:min(1040px,100%);padding:36px 40px 30px}
 .auth-lead{margin:-10px 0 26px;color:var(--muted);font-size:15px;line-height:1.65;max-width:70ch}
 @media(max-width:700px){.auth-card-wide{padding:26px 20px 22px}}
+
+/* =====================================================================
+   System health  (portal.js -> VIEWS.system)
+   Re-uses .bk-checklist from the booking section and adds a verdict column.
+   ===================================================================== */
+.sys-list li{align-items:center}
+.sys-list li span:nth-child(2){flex:1 1 auto}
+.sys-word{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#3e7d53;white-space:nowrap}
+.sys-list li.is-warn .sys-word{color:#8a6a12}
+.sys-list li.is-stop .sys-word,.sys-list li.is-fail .sys-word{color:#9c2020}
+.sys-list li.is-fail{background:#fdf3f3;border-left-color:#9c2020}
+.sys-list li.is-fail .bk-mark{color:#9c2020}
+.sys-list li.is-ok{background:#f6faf7;border-left-color:#8fbfa0}
+.plain-list{list-style:none;margin:10px 0 14px;padding:0}
+.plain-list li{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:8px 0;border-bottom:1px solid #eef0f1;font-size:14px}
+.plain-list code{word-break:break-all;background:#f3f5f6;padding:2px 6px}

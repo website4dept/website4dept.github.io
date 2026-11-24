@@ -1,8 +1,19 @@
 """End-to-end test of the booking workflow, driven straight through the WSGI app."""
-import contextlib, io, json, os, sys
+import contextlib, io, json, os, shutil, sys
 
-BACKEND = "/home/claude/site/website4dept.github.io-main/backend"
+BACKEND = os.path.dirname(os.path.abspath(__file__))
 os.chdir(BACKEND); sys.path.insert(0, BACKEND)
+# Every run starts from an empty database in a folder of its own, so one run can
+# never be upset by an earlier one and the real data/ folder is never touched.
+DATA = "data-test"
+shutil.rmtree(os.path.join(BACKEND, DATA), ignore_errors=True)
+os.makedirs(os.path.join(BACKEND, DATA))
+_cfg = json.load(open(os.path.join(BACKEND, "config.example.json")))
+_cfg["data_dir"] = DATA
+_cfg["mail"]["mode"] = "console"
+_path = os.path.join(BACKEND, DATA, "config.json")
+json.dump(_cfg, open(_path, "w"))
+os.environ["PORTAL_CONFIG"] = _path
 import server, bookings                                    # noqa: E402
 
 PASS = FAIL = 0
@@ -43,10 +54,10 @@ def make_user(email, role, person_id=None):
 def last_office_mails(n=60):
     import email, email.policy
     out = []
-    if not os.path.isdir("data/outbox"):
+    if not os.path.isdir(DATA + "/outbox"):
         return out
-    for f in sorted(os.listdir("data/outbox"))[-n:]:
-        with open("data/outbox/" + f, "rb") as fh:
+    for f in sorted(os.listdir(DATA + "/outbox"))[-n:]:
+        with open(DATA + "/outbox/" + f, "rb") as fh:
             m = email.message_from_binary_file(fh, policy=email.policy.default)
         try:
             out.append((m["Subject"] or "") + "\n" + m.get_body(preferencelist=("plain",)).get_content())
@@ -58,6 +69,8 @@ def booking_status(bid):
     return server.q1("SELECT status FROM bookings WHERE id=?", (bid,))["status"]
 def is_auto(bid):
     return bool(server.q1("SELECT auto FROM bookings WHERE id=?", (bid,))["auto"])
+def is_confirmed(bid):
+    return bool(server.q1("SELECT confirmed FROM bookings WHERE id=?", (bid,))["confirmed"])
 def log_text(bid):
     return " ".join(r["action"] + " " + r["note"] for r in
                     server.q("SELECT action,note FROM booking_log WHERE booking_id=?", (bid,)).fetchall())
@@ -145,11 +158,44 @@ s, d = hod("GET", "/api/bookings/hod")
 check("and it appears in his list", s == 200 and len(d["waiting"]) >= 1, (s, len(d.get("waiting", []))))
 s, d = hod("POST", "/api/bookings/%d/decide" % B1, {"action": "approve", "note": "Approved."})
 check("HoD approves", s == 200 and d["status"] == "approved", (s, d))
+check("but it is not confirmed by that alone", d.get("confirmed") is False, d)
+check("and nothing is sent to the person who asked",
+      not any("CONFIRMED" in m for m in last_office_mails()), "a confirmation went out too early")
+check("the office is asked to confirm it",
+      any("please confirm" in m.lower() for m in last_office_mails()), "the office was not told")
+
+print("\n--- the office confirms, and only that sends the e-mail ---")
+s, d = prof("GET", "/api/bookings/mine")
+mine = [x for x in d["bookings"] if x["id"] == B1][0]
+check("the asker is shown that the office has still to confirm",
+      mine["awaiting_office"] and "office" in mine["status_label"].lower(), mine["status_label"])
+s, d = hod("GET", "/api/bookings/hod")
+check("the Head sees what the office has not confirmed",
+      any(x["id"] == B1 for x in d["awaiting_office"]), d.get("awaiting_office"))
+s, d = office("GET", "/api/bookings/queue")
+check("the office has it in Ready to confirm",
+      any(x["id"] == B1 for x in d["to_confirm"]) and d["counts"]["to_confirm"] >= 1, d["counts"])
+s, d = office("GET", "/api/bookings/%d/check" % B1)
+check("the office can run the checklist over it", s == 200 and len(d["checks"]) >= 5, (s, d))
+check("the checklist says the e-mail has somewhere to go",
+      any(c["what"].startswith("Address") and c["level"] == "ok" for c in d["checks"]), d["checks"])
+s, d = office("POST", "/api/bookings/%d/office" % B1, {"action": "confirm"})
+check("the office confirms it", s == 200 and d.get("confirmed"), (s, d))
+check("now the confirmation goes out", any("CONFIRMED" in m for m in last_office_mails()), "none sent")
+check("and the booking is marked confirmed", is_confirmed(B1), "not marked")
+s, d = office("POST", "/api/bookings/%d/office" % B1, {"action": "confirm"})
+check("it cannot be confirmed twice", s == 400, (s, d.get("error")))
+s, d = hod("GET", "/api/bookings/hod")
+check("the Head no longer sees it waiting on the office",
+      not any(x["id"] == B1 for x in d["awaiting_office"]), d.get("awaiting_office"))
 
 print("\n--- the slot is now really held ---")
-office("POST", "/api/bookings/%d/office" % B2, {"action": "forward"})
+s2, d2 = office("POST", "/api/bookings/%d/office" % B2, {"action": "forward"})
+check("the office cannot forward a request whose slot is gone", s2 == 409, (s2, d2.get("error")))
+check("and it says which room and when", "Seminar Hall" in (d2.get("error") or ""), d2.get("error"))
+check("so the request is still on the office desk", booking_status(B2) == "pending", booking_status(B2))
 s2, d2 = hod("POST", "/api/bookings/%d/decide" % B2, {"action": "approve"})
-check("a competing request cannot be approved into the taken slot", s2 == 409, (s2, d2.get("error")))
+check("the Head was never given it to approve", s2 == 400, (s2, d2.get("error")))
 s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DAY, "start": "10:30", "end": "11:00",
                                       "title": "Overlapping talk"})
 check("a new overlapping request is refused", s == 409, (s, d.get("error")))
@@ -177,6 +223,9 @@ check("forwarding it approves it at once under standing approval",
       s == 200 and d["status"] == "approved" and d.get("auto"), (s, d))
 check("and it is marked as automatic", booking_status(B5) == "approved" and is_auto(B5),
       (booking_status(B5), is_auto(B5)))
+check("an automatic approval still waits for the office", not is_confirmed(B5), "confirmed too early")
+s, d = office("POST", "/api/bookings/%d/office" % B5, {"action": "confirm"})
+check("which the office then confirms", s == 200 and d.get("confirmed"), (s, d))
 
 s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DAY, "start": "15:30", "end": "19:30",
                                       "title": "All-evening workshop", "attendees": 80, "outside": True})
@@ -227,6 +276,8 @@ overlapping = [(a["ref"], b2["ref"]) for i, a in enumerate(rows) for b2 in rows[
 check("no two confirmed bookings of a room overlap", not overlapping, overlapping)
 s, d = hod("POST", "/api/bookings/%d/revoke" % B5, {"note": "Institute event in the hall."})
 check("a confirmed booking can be withdrawn", s == 200, (s, d))
+check("and the booker is told it is cancelled",
+      any("CANCELLED" in m for m in last_office_mails()), "no cancellation sent")
 s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DAY, "start": "14:00", "end": "15:00",
                                       "title": "Re-using the freed slot"})
 check("the freed slot can be booked again", s == 200, (s, d.get("error")))
@@ -266,10 +317,69 @@ nocsrf = Client("sid-prof@iitkgp.ac.in", None)
 s, d = nocsrf("POST", "/api/bookings", req)
 check("a POST without the CSRF token is refused", s == 403, s)
 
+print("\n--- the office switch: confirm as soon as the HoD approves ---")
+server.q("UPDATE rooms SET auto_ok=0 WHERE id=?", (HALL,))   # make the Head decide again
+s, d = prof("PUT", "/api/bookings/settings", {"office_auto_confirm": True})
+check("faculty cannot change booking settings", s == 403, s)
+s, d = office("PUT", "/api/bookings/settings", {"max_hours": 9})
+check("the office cannot change the Head's rules", s == 403, (s, d.get("error", "")[:40]))
+s, d = office("PUT", "/api/bookings/settings", {"office_auto_confirm": True})
+check("but the office can switch confirm-on-approval on", s == 200 and d["office_auto_confirm"], (s, d))
+s, d = office("GET", "/api/bookings/queue")
+check("and sees it switched on", d.get("office_auto_confirm") is True, d.get("office_auto_confirm"))
+
+D9 = (server.now() + server.timedelta(days=55)).strftime("%Y-%m-%d")
+s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": D9, "start": "10:00", "end": "11:00",
+                                      "title": "Talk with the switch on"})
+B9 = d["booking"]["id"]
+office("POST", "/api/bookings/%d/office" % B9, {"action": "forward"})
+s, d = hod("POST", "/api/bookings/%d/decide" % B9, {"action": "approve"})
+check("with the switch on the HoD's approval confirms it straight away",
+      s == 200 and d.get("confirmed") and is_confirmed(B9), (s, d))
+check("no second click is left for the office",
+      not any(x["id"] == B9 for x in office("GET", "/api/bookings/queue")[1]["to_confirm"]), B9)
+s, d = office("PUT", "/api/bookings/settings", {"office_auto_confirm": False})
+check("the office can switch it off again", s == 200 and d["office_auto_confirm"] is False, (s, d))
+
+print("\n--- the HoD clears a whole day at once ---")
+D10 = (server.now() + server.timedelta(days=56)).strftime("%Y-%m-%d")
+made = []
+for t0, t1, name in (("09:00", "10:00", "Day clear A"), ("11:00", "12:00", "Day clear B"),
+                     ("13:00", "14:00", "Day clear C")):
+    s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": D10, "start": t0, "end": t1, "title": name})
+    check("request for " + name + " accepted", s == 200, (s, d.get("error")))
+    made.append(d["booking"]["id"])
+    office("POST", "/api/bookings/%d/office" % d["booking"]["id"], {"action": "forward"})
+s, d = hod("GET", "/api/bookings/hod")
+check("the Head's page lists the dates waiting on him",
+      any(x["date"] == D10 and x["count"] == 3 for x in d["days"]), d.get("days"))
+s, d = hod("POST", "/api/bookings/decide-many", {"date": D10, "action": "approve", "note": "Whole day cleared."})
+check("approve everything on one date", s == 200 and d["done"] == 3, (s, d))
+check("and every one of them still waits for the office",
+      all(not is_confirmed(i) for i in made), [is_confirmed(i) for i in made])
+s, d = office("GET", "/api/bookings/queue")
+check("so all three sit in Ready to confirm",
+      len([x for x in d["to_confirm"] if x["id"] in made]) == 3, d["counts"])
+for i in made:
+    office("POST", "/api/bookings/%d/office" % i, {"action": "confirm"})
+check("the office lets them out one by one", all(is_confirmed(i) for i in made), made)
+
+print("\n--- nothing unconfirmed reaches the Notice Board ---")
+s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": D9, "start": "15:00", "end": "16:00",
+                                      "title": "Unconfirmed talk"})
+B11 = d["booking"]["id"]
+office("POST", "/api/bookings/%d/office" % B11, {"action": "forward"})
+hod("POST", "/api/bookings/%d/decide" % B11, {"action": "approve"})
+s, d = office("POST", "/api/bookings/%d/notice" % B11, {"tag": "Seminar"})
+check("an unconfirmed booking cannot be published", s == 400, (s, d.get("error", "")[:60]))
+office("POST", "/api/bookings/%d/office" % B11, {"action": "confirm"})
+s, d = office("POST", "/api/bookings/%d/notice" % B11, {"tag": "Seminar"})
+check("a confirmed one can be", s == 200, (s, d.get("error")))
+
 print("\n--- e-mails ---")
-out = sorted(os.listdir("data/outbox")) if os.path.isdir("data/outbox") else []
+out = sorted(os.listdir(DATA + "/outbox")) if os.path.isdir(DATA + "/outbox") else []
 check("e-mails were produced", len(out) > 10, len(out))
-text = "".join(open("data/outbox/" + f, encoding="utf-8", errors="replace").read() for f in out)
+text = "".join(open(DATA + "/outbox/" + f, encoding="utf-8", errors="replace").read() for f in out)
 for want in ("waiting for approval", "for your approval", "CONFIRMED", "SENT BACK", "CANCELLED"):
     check("e-mail sent: " + want, want in text, text[:200])
 check("the office is copied in rather than sent a separate mail", "Cc:" in text)

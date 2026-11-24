@@ -4,6 +4,97 @@ Newest first. Each entry says what was asked for, which files changed, and why.
 
 ---
 
+## 24 November 2026 — Plain page headings, approve-then-confirm, and a safer server
+
+Three things were asked for: take the maroon strip off every tab except the home
+page, do the "betterment" items proposed earlier, and change the booking flow so
+that the Head approving is no longer what tells the person who asked.
+
+### 1. The maroon strip is gone from the inner pages
+
+**Before:** Academics, Students, Publications and News & Events each opened with a
+400-pixel maroon band. Research, People and Contact did not, so the site did not
+look like one site.
+**Now:** all of them open the way Research does — breadcrumbs, a small gold
+eyebrow, a dark serif heading and one line of intro, on white. The home page is
+untouched. Faculty profile pages keep their dark header, because a person's photo
+sits inside it and it reads as a card rather than a strip; say the word and it goes
+too.
+
+| File | Change |
+|---|---|
+| `style.css` | `.page-hero` is now white with dark text, no fixed height, no `∫ ∑ π ∞ ∇` watermark. The old maroon treatment was moved to `.page-hero.profile-hero`, which only profile.html uses. `.breadcrumbs` recoloured for a light background. |
+
+Nothing in any HTML file changed for this — one rule in one stylesheet does all of
+it, so it is easy to undo.
+
+### 2. The Head approves, the office confirms
+
+**Before:** the moment the Head pressed Approve, the confirmation e-mail went to
+the person who asked.
+**Now:** his approval sends nothing to them at all. The booking moves into the
+office's **Ready to confirm** list, and the e-mail goes out only when the office
+presses **Confirm booking** — To the person who asked, Cc the office, Cc the
+faculty advisor if one was named. This is true of all three ways a request gets
+approved: the Head pressing Approve, the Head clearing a whole date at once, and
+the standing-approval rule applying by itself.
+
+Everyone can see where a request is stuck:
+
+* the person who asked sees *"Approved by the HoD — office to confirm"*;
+* the office has two counters, *with the Head, not yet approved* and *approved —
+  ready for you to confirm*;
+* the Head has a table, *Approved by you — waiting for the office to confirm*;
+* System health warns if anything has been unconfirmed for more than two days.
+
+**The office can switch this off.** A tick box at the bottom of Booking requests,
+*"Confirm as soon as the Head approves"*, sends approvals out immediately. It
+belongs to the office — the Head cannot change it from his page — and it is off to
+begin with.
+
+**Nothing leaves the office desk unchecked.** Forward and Confirm now open a
+checklist first: is the room really free, is the date inside the booking window, is
+the room big enough, is there an address to write to, is anybody else asking for
+the slot, has this person failed to turn up before. A red ✕ stops it; an amber ! is
+a judgement call. The same checks run again on the server when the button is
+pressed, so a stale page cannot wave anything through.
+
+| File | Change |
+|---|---|
+| `backend/bookings.py` | new `confirmed` / `confirmed_by` / `confirmed_at` columns (added automatically to an existing database); `approve()` no longer e-mails the asker and takes a `confirm_now` flag; new `confirm_booking()`, `office_checks()`, `blockers()`, `api_office_check()`, `status_label()`; new `mail_awaiting_office()`; `api_queue` returns a `to_confirm` tray; `api_hod` returns `awaiting_office` and a `days` list; `decide-many` accepts a `date`; `office_auto_confirm` setting, writable by the office; the Notice Board and the "confirmed, still to come" list now require `confirmed = 1`; withdrawing an unconfirmed booking says "not approved" rather than "cancelled", because the asker was never told it was approved |
+| `portal/bookings.js` | the checklist panel; the **Ready to confirm** table; the confirm-on-approval tick box; **Clear a whole day** buttons on the Head's page; the Head's *waiting for the office* table; the status chip shows the in-between state in amber |
+| `portal/portal.css` | styles for the checklist, the tick box and the day buttons |
+| `backend/test_bookings.py` | 112 checks (was 76) |
+
+### 3. The betterment items
+
+| What | Where | Why |
+|---|---|---|
+| **Content-Security-Policy** | `backend/server.py` (`CSP`), and the same line in both deploy configs | the browser now refuses to run any script that is not one of our own files. This is the single biggest protection against a script smuggled in through a notice or a booking title. |
+| **No script written inside a page** | new `contact.js`; the logo fallback moved into `footer.js`, `room-booking.js`, `portal/portal.js`; `onload=` / `onerror=` attributes removed from `contact.html` | a strict policy forbids them, and they were the only ones left |
+| **The logo is served from our own site** | new `assets/` folder, `assets/README.md`, all 16 pages | it used to be fetched from `nptel.iitkgp.ac.in` on every page load. Drop `assets/iitkgp-logo.png` in and that stops; until then it still falls back, so nothing breaks. |
+| **The website no longer depends on Python** | `deploy/nginx-site.conf`, `deploy/apache-site.conf`, new `portal-down.html` | nginx used to hand *every* request to the portal, so a Python fault took the whole site down. It now serves the pages itself and passes on only `/api/` and `/portal/`. If Python stops, the website keeps working and only signing in and booking are affected. |
+| **Backups that survive the machine** | new `deploy/backup-offsite.sh`, new `python3 server.py backup` | the existing six-hourly backup sits on the same disk as the database. This script copies it elsewhere; set it up once from the instructions at the top of the file. |
+| **System health page** | `backend/server.py` (`system_report()`, `/api/admin/system`), `portal/portal.js` (`VIEWS.system`) | Admin → System health: database, disk space, backups, off-site copy, e-mail, HTTPS, failed sign-ins, locked accounts, bookings nobody has confirmed, staff with no address. Green / amber / red, in plain words. |
+| **A daily warning e-mail** | `backend/server.py` (`daily_health_mail_loop`) | the same list is checked once a day and e-mailed to the admins **only when something is wrong**, so a message arriving means something really does need attention. |
+| **`SECURITY.md`** | new | what protects the site, what you have to do yourself, what to do when something goes wrong, and an honest list of what is still open. |
+
+### 4. Housekeeping
+
+* Every page now carries the same `?v=32` on its stylesheet and scripts — they had
+  drifted to a mixture of 29, 30 and 31, which meant some browsers were being
+  served a stale stylesheet.
+* The three test suites no longer hard-code a folder path and no longer share a
+  database: each run creates and throws away `backend/data-test/`, so a run can
+  never be upset by an earlier one and your real `backend/data/` is never touched.
+  **221 checks, all passing** (112 + 62 + 47).
+* `BOOKINGS.md`, `HOW-TO-UPDATE.md` and the deploy configs were rewritten to match.
+* Deleted the leftover `gallery/Dept Photo.jpeg` (4.3 MB). Nothing referenced it —
+  the slideshow uses the renamed, compressed `gallery/dept-photo.jpg` — and having
+  both broke the "no two names that differ only in capitals and spaces" rule.
+
+---
+
 ## 23 November 2026 — The Head is e-mailed only when the office forwards
 
 Requested: the HoD should get the mail only when the office forwards a request to

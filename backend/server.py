@@ -33,6 +33,7 @@ import mimetypes
 import os
 import re
 import secrets
+import shutil
 import smtplib
 import sqlite3
 import sys
@@ -712,10 +713,50 @@ STATUS_TEXT = {200: "200 OK", 201: "201 Created", 204: "204 No Content", 400: "4
                409: "409 Conflict", 413: "413 Payload Too Large", 429: "429 Too Many Requests",
                500: "500 Internal Server Error"}
 
+# ---------------------------------------------------------------------------
+# Content-Security-Policy
+#
+# This is the browser's own rule book for the page: it says where scripts,
+# styles, images and fonts may come from.  If an attacker ever managed to get
+# a <script> into a page - through a notice, a profile, a booking title - the
+# browser would simply refuse to run it, because it is not one of our files.
+#
+# script-src is kept strict ('self' only, no 'unsafe-inline'), which is where
+# nearly all of the protection comes from.  That is why there is no longer a
+# single <script> written inside a page and no onclick="" / onerror="" in the
+# markup: contact.js and the logo fallback in footer.js replaced them.
+#
+# style-src still allows 'unsafe-inline' because a handful of places build a
+# style="..." string in JavaScript (portal/portal.js, board.js).  Inline CSS is
+# a far smaller risk than inline script.  SECURITY.md lists them if you ever
+# want to move them into portal.css and tighten this line.
+#
+# The three outside addresses are: Google Fonts (the two font servers), and the
+# Institute's NPTEL server, which is only needed until the logo is saved at
+# assets/iitkgp-logo.png - see assets/README.md.
+# ---------------------------------------------------------------------------
+CSP = "; ".join([
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: https://nptel.iitkgp.ac.in",
+    "media-src 'self'",
+    "connect-src 'self'",
+    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
+    "frame-ancestors 'self'",
+    "form-action 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+])
+
 SECURITY_HEADERS = [
     ("X-Content-Type-Options", "nosniff"),
     ("Referrer-Policy", "same-origin"),
     ("X-Frame-Options", "SAMEORIGIN"),
+    ("Content-Security-Policy", CSP),
+    ("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=()"),
+    ("Cross-Origin-Opener-Policy", "same-origin"),
 ]
 
 
@@ -1954,6 +1995,168 @@ def auto_backup_loop():
         time.sleep(6 * 3600)
 
 
+# ---------------------------------------------------------------------------
+# System health
+#
+# "python3 server.py check" answers "is this server set up correctly?" - a
+# question you ask once, before going live.  The report below answers a
+# different question: "is it healthy right now?"  It is what the portal's
+# System health page shows, and what the daily warning e-mail is built from.
+#
+# Every entry is {"level": ok|warn|fail, "what": ..., "detail": ...}.
+# ---------------------------------------------------------------------------
+def _age_hours(path):
+    try:
+        return (time.time() - os.path.getmtime(path)) / 3600.0
+    except OSError:
+        return None
+
+
+def system_report():
+    out = []
+    def add(level, what, detail=""):
+        out.append({"level": level, "what": what, "detail": detail})
+
+    # --- the database -------------------------------------------------------
+    try:
+        size = os.path.getsize(DB_PATH) / (1024.0 * 1024.0)
+        row = db().execute("PRAGMA quick_check").fetchone()
+        okdb = (row[0] == "ok") if row else False
+        add("ok" if okdb else "fail", "Database",
+            "{:.1f} MB, {}".format(size, "no faults found" if okdb else "sqlite reports: " + str(row and row[0])))
+    except Exception as e:
+        add("fail", "Database", "cannot be read: {}".format(e))
+
+    # --- room on the disk ---------------------------------------------------
+    try:
+        du = shutil.disk_usage(CFG["data_dir"])
+        free = du.free / (1024.0 ** 3)
+        add("fail" if free < 0.2 else ("warn" if free < 1 else "ok"), "Free disk space",
+            "{:.1f} GB free of {:.1f} GB".format(free, du.total / (1024.0 ** 3)))
+    except Exception as e:
+        add("warn", "Free disk space", str(e))
+
+    # --- backups ------------------------------------------------------------
+    try:
+        files = sorted(f for f in os.listdir(BACKUP_DIR) if f.startswith("portal-") and f.endswith(".db"))
+        if not files:
+            add("fail", "Backups", "no backup has been taken yet")
+        else:
+            age = _age_hours(os.path.join(BACKUP_DIR, files[-1]))
+            add("ok" if age is not None and age < 36 else "warn", "Backups",
+                "{} kept, newest {}".format(len(files),
+                    "just now" if age is None else "{:.0f} hours old".format(age)))
+    except OSError:
+        add("fail", "Backups", "the backups folder does not exist yet")
+
+    # --- off-site copy ------------------------------------------------------
+    off = CFG.get("offsite_backup_marker") or os.path.join(CFG["data_dir"], "offsite-last-run")
+    age = _age_hours(off)
+    if age is None:
+        add("warn", "Copy kept off this machine",
+            "never run. A backup on the same machine is lost with the machine - see deploy/backup-offsite.sh")
+    else:
+        add("ok" if age < 36 else "warn", "Copy kept off this machine", "{:.0f} hours ago".format(age))
+
+    # --- e-mail -------------------------------------------------------------
+    m = CFG["mail"]
+    if m["mode"] == "smtp":
+        add("ok", "E-mail", "sent through {}".format(m.get("smtp_host") or "?"))
+    else:
+        add("fail", "E-mail", "mode is '{}' - login codes and booking letters are NOT being sent".format(m["mode"]))
+
+    # --- https --------------------------------------------------------------
+    https = str(CFG.get("base_url", "")).startswith("https://")
+    add("ok" if https and CFG["secure_cookies"] else "warn", "HTTPS",
+        "base_url {} and secure_cookies {}".format("is https" if https else "is NOT https",
+                                                   "on" if CFG["secure_cookies"] else "off"))
+
+    # --- accounts -----------------------------------------------------------
+    since = iso(now() - timedelta(hours=24))
+    fails = q1("SELECT COUNT(*) c FROM audit WHERE action='login.failed' AND at>=?", (since,))["c"]
+    add("warn" if fails > 50 else "ok", "Failed sign-ins in the last day",
+        "{}".format(fails) + (" - unusually many; look at the activity log" if fails > 50 else ""))
+    locked = q1("SELECT COUNT(*) c FROM users WHERE locked_until IS NOT NULL AND locked_until>?",
+                (iso(now()),))["c"]
+    add("warn" if locked else "ok", "Accounts locked out just now", str(locked))
+    admins = q1("SELECT COUNT(*) c FROM users WHERE role='admin' AND active=1")["c"]
+    add("ok" if admins else "fail", "Active admin accounts", str(admins))
+
+    # --- room bookings ------------------------------------------------------
+    try:
+        waiting = q1("SELECT COUNT(*) c FROM bookings WHERE status='pending'")["c"]
+        withhod = q1("SELECT COUNT(*) c FROM bookings WHERE status='forwarded'")["c"]
+        unconf = q("SELECT ref,on_date FROM bookings WHERE status='approved' AND confirmed=0"
+                   " ORDER BY on_date").fetchall()
+        old = q1("SELECT COUNT(*) c FROM bookings WHERE status='approved' AND confirmed=0 AND updated<?",
+                 (iso(now() - timedelta(days=2)),))["c"]
+        add("warn" if waiting > 10 else "ok", "Requests waiting with the office", str(waiting))
+        add("ok", "Requests waiting with the Head", str(withhod))
+        add("warn" if old else "ok", "Approved but not yet confirmed by the office",
+            "{}".format(len(unconf)) +
+            (" - {} of them have been sitting for more than two days; nobody has been told their room is booked".format(old)
+             if old else ""))
+    except sqlite3.Error:
+        pass        # the booking tables are only there once bookings.py is installed
+
+    # --- the website itself -------------------------------------------------
+    try:
+        people = all_people()
+        cur = [p for p in people if p.get("status") == "current"]
+        noemail = [p for p in cur if p.get("type") in ("faculty", "staff") and not p.get("email")]
+        add("warn" if noemail else "ok", "Staff with no e-mail address on file",
+            "{} of {}".format(len(noemail), len(cur)) +
+            (" - these people cannot be sent anything, and cannot use the booking form" if noemail else ""))
+    except Exception:
+        pass
+
+    if os.name == "posix" and os.path.exists(CONFIG_PATH):
+        mode = os.stat(CONFIG_PATH).st_mode & 0o077
+        add("ok" if not mode else "warn", "config.json is private",
+            "yes" if not mode else "no - other users on this machine can read the mail password. Run: chmod 600 config.json")
+    return out
+
+
+@route("GET", "/api/admin/system")
+def api_system(req):
+    require_admin(req)
+    rep = system_report()
+    return {"checks": rep,
+            "bad": sum(1 for c in rep if c["level"] == "fail"),
+            "warn": sum(1 for c in rep if c["level"] == "warn"),
+            "data_dir": CFG["data_dir"], "db": DB_PATH,
+            "base_url": CFG.get("base_url", ""), "at": iso(now())}
+
+
+def daily_health_mail_loop():
+    """
+    Once a day, look the system over and e-mail the admins if anything is
+    wrong.  Nothing is sent when everything is fine, so an e-mail arriving
+    means something really does want attention.
+    """
+    time.sleep(120)                     # let the server finish starting
+    while True:
+        try:
+            rep = system_report()
+            bad = [c for c in rep if c["level"] == "fail"]
+            warn = [c for c in rep if c["level"] == "warn"]
+            if bad or len(warn) >= 3:
+                to = [r["email"] for r in
+                      q("SELECT email FROM users WHERE role='admin' AND active=1").fetchall()]
+                if to:
+                    lines = ["The nightly check of the department portal found something to look at.", ""]
+                    for c in bad + warn:
+                        lines.append(("PROBLEM  " if c["level"] == "fail" else "check    ")
+                                     + c["what"] + ": " + c["detail"])
+                    lines += ["", "Everything else looked normal.", "",
+                              "The full list is in the portal: Admin -> System health."]
+                    send_mail(to[0], "Department portal: {} thing(s) to look at".format(len(bad) + len(warn)),
+                              "\n".join(lines), cc=to[1:] or None)
+        except Exception as e:                                   # pragma: no cover
+            print("Health check problem:", e)
+        time.sleep(24 * 3600)
+
+
 @route("GET", "/api/admin/backup.zip")
 def api_backup(req):
     admin = require_admin(req)
@@ -2265,10 +2468,20 @@ def cli():
             f.write(notices_js())
         print("Wrote people-data.js and notices-data.js to", out)
         return
+    if cmd == "backup":
+        # python3 server.py backup [folder]  -> one .db snapshot, safe to copy away.
+        # Used by deploy/backup-offsite.sh; also fine to run by hand.
+        out = args[1] if len(args) > 1 else BACKUP_DIR
+        os.makedirs(out, exist_ok=True)
+        dest = os.path.join(out, "portal-{}.db".format(now().strftime("%Y%m%d-%H%M%S")))
+        snapshot_db(dest)
+        print(dest)
+        return
     if cmd != "serve":
         print(__doc__)
         return
     threading.Thread(target=auto_backup_loop, daemon=True).start()
+    threading.Thread(target=daily_health_mail_loop, daemon=True).start()
     host, port = CFG["host"], int(CFG["port"])
     print("Serving {} on http://{}:{}  (mail mode: {}, invite mode: {})".format(
         CFG["site_name"], host, port, CFG["mail"]["mode"], CFG["invite_mode"]))

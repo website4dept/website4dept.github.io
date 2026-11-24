@@ -1,3 +1,28 @@
+/* ---------------------------------------------------------------------------
+   The Institute logo.  Pages ask for assets/iitkgp-logo.png first; until that
+   file is put there (see assets/README.md) we fall back to the copy on the
+   Institute's NPTEL server.  This is done here rather than with an onerror=""
+   attribute in the page, because the site runs under a Content-Security-Policy
+   that forbids script written inside the page.
+   --------------------------------------------------------------------------- */
+(function(){
+  var FALLBACK = "https://nptel.iitkgp.ac.in/images/logo.png";
+  function fix(){
+    var imgs = document.querySelectorAll('img[src$="assets/iitkgp-logo.png"]');
+    for (var i = 0; i < imgs.length; i++){
+      (function(img){
+        img.addEventListener("error", function once(){
+          img.removeEventListener("error", once);
+          img.src = FALLBACK;
+        });
+        if (img.complete && img.naturalWidth === 0) img.src = FALLBACK;
+      })(imgs[i]);
+    }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fix);
+  else fix();
+})();
+
 /* =====================================================================
    Department portal – login, password set-up, profile editor, admin panel
    Talks to backend/server.py through /api/...
@@ -250,7 +275,8 @@
     if (ME.role === 'admin'){
       items.push(['Administration'], ['overview', '◧', 'Overview'], ['accounts', '👤', 'Accounts'], ['people', '☷', 'People & profiles'], ['scholars', '🎓', 'Research scholars'], ['students', '🧑‍🎓', 'Students'],
                  ['import', '⇪', 'Import data (JSON)'], ['notices', '📌', 'Notices & events'], ['gallery', '🖼', 'Gallery'], ['email', '✉', 'Send e-mail'], ['lists', '☰', 'Mailing lists'],
-                 ['activity', '⟲', 'Activity log'], ['export', '⬇', 'Export for website'], ['backup', '🗄', 'Backup & restore']);
+                 ['activity', '⟲', 'Activity log'], ['export', '⬇', 'Export for website'], ['backup', '🗄', 'Backup & restore'],
+                 ['system', '⚕', 'System health']);
     } else if (ME.role === 'notices'){
       items.push(['Content editor'], ['notices', '📌', 'Notices & events'], ['gallery', '🖼', 'Gallery']);
     } else if (ME.role === 'people'){
@@ -1189,6 +1215,50 @@
   };
 
   /* ---------------- backup & restore ---------------- */
+  /* =====================================================================
+     System health
+     Not the same thing as "python3 server.py check", which asks whether the
+     server is set up correctly. This asks whether it is healthy right now:
+     backups, disk space, e-mail, bookings nobody has confirmed, and so on.
+     The same list is e-mailed to admins once a day, but only when something
+     needs attention.
+     ===================================================================== */
+  VIEWS.system = async function(){
+    const MARK = {ok: '\u2713', warn: '!', fail: '\u2715'};
+    const WORD = {ok: 'Fine', warn: 'Worth a look', fail: 'Needs attention'};
+    const d = await api('GET', '/admin/system');
+    const line = c =>
+      '<li class="is-' + c.level + '"><span class="bk-mark">' + MARK[c.level] + '</span>' +
+      '<span><strong>' + esc(c.what) + '</strong>' +
+      (c.detail ? '<small>' + esc(c.detail) + '</small>' : '') + '</span>' +
+      '<span class="sys-word">' + WORD[c.level] + '</span></li>';
+    const bad = d.checks.filter(c => c.level === 'fail');
+    const warn = d.checks.filter(c => c.level === 'warn');
+    const fine = d.checks.filter(c => c.level === 'ok');
+    $('#view').innerHTML = head('System health',
+        'How the portal is doing at this moment. Anything on this list that is not green is ' +
+        'also e-mailed to the admins once a day \u2014 and nothing is e-mailed when everything is fine, ' +
+        'so a message arriving really does mean something wants looking at.',
+        '<button type="button" class="btn btn-light btn-sm" id="sysAgain">Check again</button>') +
+      '<div class="stat-grid">' +
+        '<div class="stat-card' + (bad.length ? ' is-urgent' : '') + '"><strong>' + bad.length +
+          '</strong><span>needing attention</span></div>' +
+        '<div class="stat-card"><strong>' + warn.length + '</strong><span>worth a look</span></div>' +
+        '<div class="stat-card"><strong>' + fine.length + '</strong><span>fine</span></div>' +
+      '</div>' +
+      '<ul class="bk-checklist sys-list">' + bad.concat(warn, fine).map(line).join('') + '</ul>' +
+      '<div class="card"><h3>Where things are</h3>' +
+        '<ul class="plain-list">' +
+          '<li><strong>Database</strong><code>' + esc(d.db) + '</code></li>' +
+          '<li><strong>Data folder</strong><code>' + esc(d.data_dir) + '</code></li>' +
+          '<li><strong>Site address</strong><code>' + esc(d.base_url || '(not set)') + '</code></li>' +
+        '</ul>' +
+        '<p class="hint">To check the settings rather than the running system, on the server run ' +
+        '<code>python3 server.py check</code>. To take a copy of the database away from this machine, ' +
+        'see <code>deploy/backup-offsite.sh</code>.</p></div>';
+    $('#sysAgain').addEventListener('click', () => VIEWS.system());
+  };
+
   VIEWS.backup = function(){
     $('#view').innerHTML = head('Backup & restore', 'Everything in the portal (people, notices, gallery list, accounts, uploads) in one file.') +
       '<div class="card"><h3>Download a backup</h3><p class="hint">Keep this file safe – it contains accounts. The server also keeps a daily copy of the database (last 14 days) in <code>backend/data/backups/</code>.</p>' +

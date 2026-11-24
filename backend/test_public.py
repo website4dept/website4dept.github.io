@@ -1,7 +1,18 @@
 """The booking form on the website: register check, six-digit code, routing, threaded e-mails."""
-import contextlib, email, email.policy, io, json, os, re, sys
-BACKEND = "/home/claude/site/website4dept.github.io-main/backend"
+import contextlib, email, email.policy, io, json, os, re, shutil, sys
+BACKEND = os.path.dirname(os.path.abspath(__file__))
 os.chdir(BACKEND); sys.path.insert(0, BACKEND)
+# Every run starts from an empty database in a folder of its own, so one run can
+# never be upset by an earlier one and the real data/ folder is never touched.
+DATA = "data-test"
+shutil.rmtree(os.path.join(BACKEND, DATA), ignore_errors=True)
+os.makedirs(os.path.join(BACKEND, DATA))
+_cfg = json.load(open(os.path.join(BACKEND, "config.example.json")))
+_cfg["data_dir"] = DATA
+_cfg["mail"]["mode"] = "console"
+_path = os.path.join(BACKEND, DATA, "config.json")
+json.dump(_cfg, open(_path, "w"))
+os.environ["PORTAL_CONFIG"] = _path
 import server, bookings
 
 PASS = FAIL = 0
@@ -38,8 +49,8 @@ def set_email(pid, email):
 def last_mails(n=40):
     """Header block + decoded body, so quoted-printable line breaks do not confuse the checks."""
     out = []
-    for f in sorted(os.listdir("data/outbox"))[-n:]:
-        with open("data/outbox/" + f, "rb") as fh:
+    for f in sorted(os.listdir(DATA + "/outbox"))[-n:]:
+        with open(DATA + "/outbox/" + f, "rb") as fh:
             m = email.message_from_binary_file(fh, policy=email.policy.default)
         head = "\n".join("{}: {}".format(k, v) for k, v in m.items())
         try:
@@ -137,6 +148,12 @@ check("only now is the Head e-mailed",
 s, d = call("POST", "/api/bookings/%d/decide" % bid, {"action": "approve", "note": "Approved."},
             sid="sidhod", csrf="csidhod")
 check("approved", s == 200 and d["status"] == "approved", (s, d))
+check("but nothing is confirmed to the booker yet", d.get("confirmed") is False, d)
+check("no confirmation has gone out", not [m for m in last_mails(4) if REF in m and "CONFIRMED" in m],
+      "sent too early")
+s, d = call("POST", "/api/bookings/%d/office" % bid, {"action": "confirm"},
+            sid="sidoffice", csrf="csidoffice")
+check("the office confirms it", s == 200 and d.get("confirmed"), (s, d))
 mails = last_mails(4)
 conf = [m for m in mails if REF in m and "CONFIRMED" in m]
 check("confirmation e-mail sent", bool(conf))

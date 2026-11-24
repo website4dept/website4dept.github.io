@@ -44,7 +44,9 @@ Everything else keeps working; the tables simply sit unused.
 
 ## 2. The flow
 
-There are two ways in. Both end in the same place: the department office.
+There are two ways in. Both end in the same place: the department office. And they
+end there a second time, because **approval and confirmation are two separate
+steps, done by two different people.**
 
 ```
   the booking form on the website            the portal, for people already signed in
@@ -55,25 +57,78 @@ There are two ways in. Both end in the same place: the department office.
           └───────────────────┬────────────────────────┘
                               ▼
                    THE DEPARTMENT OFFICE                      status: pending
-                   checks every request, then
-                      ├── Return  ──► back to the asker to correct
-                      ├── Reject  ──► refused, with a reason
-                      ├── Confirm ──► approved   (rooms that do not need the Head)
-                      └── Forward ──► the Head of the Department
+                   runs the checklist (details + is the room free?)
+                      ├── Return  ──► back to the asker to correct    status: returned
+                      ├── Reject  ──► refused, with a reason          status: rejected
+                      ├── Confirm ──► booked   (rooms that do not need the Head)
+                      └── Forward ──► the Head of the Department      status: forwarded
                                         │
                                         ├── standing approval covers it
                                         │   and it is routine ──► approved at once
-                                        └── otherwise ──► he approves or rejects
+                                        └── otherwise, he approves or rejects
+                                              │
+                                              ▼
+                                        status: approved, confirmed = 0
+                              "Approved by the HoD — office to confirm"
+                                   nothing has been sent to anybody
+                                              │
+                              ▼───────────────┘
+                   THE DEPARTMENT OFFICE again
+                   Booking requests ▸ Ready to confirm
+                      └── Confirm booking ──► confirmed = 1
+                                              ▼
+                              the e-mail finally goes out:
+                                 To:  the person who asked
+                                 Cc:  the department office
+                                 Cc:  the faculty advisor, if one was named
 ```
 
-**The Head is e-mailed only when the office forwards a request.** Nothing reaches
-him, and no approval e-mail is sent, while a request is still sitting with the
-office. In the code there is a single call to `mail_forwarded()`, inside
-`api_office()`, so this cannot happen by another route.
+### Why the two steps
 
-His standing approval is applied at that same moment: if he has ticked the room and
-the request is routine, forwarding it confirms it immediately and he is not
-troubled at all.
+The Head approving means *"the department has no objection"*. The office confirming
+means *"the room is really yours"*. Only the office knows about the key, the late
+clash, the furniture, the other half of the morning. So the Head's approval no
+longer sends anything at all, and the booking sits in the office's **Ready to
+confirm** tray until somebody there presses the button.
+
+This is true of all three ways a request can be approved — the Head pressing
+Approve, the Head clearing a whole date in one click, and the standing-approval
+rule applying automatically. None of them e-mails the person who asked.
+
+**One switch changes it.** The office can tick *"Confirm as soon as the Head
+approves"* at the bottom of Booking requests. With that on, an approval goes
+straight out and nothing waits in the tray. It is off to begin with. The setting is
+the office's own: the Head and the admin can see it, but the office is the one who
+owns it (`office_auto_confirm` in the booking settings).
+
+### Who can see what is stuck where
+
+* **The person who asked** sees *"Approved by the HoD — office to confirm"* in
+  Book a room, so they are never left guessing.
+* **The office** sees two counters at the top of Booking requests: *with the Head,
+  not yet approved* and *approved — ready for you to confirm*.
+* **The Head** sees a table, *Approved by you — waiting for the office to confirm*,
+  so he can see what has stalled without asking.
+* **System health** (Admin) turns it into a warning if anything has been sitting
+  unconfirmed for more than two days.
+
+### The checklist before anything leaves the office
+
+Forward and Confirm no longer act straight away. Both open a checklist first
+(`GET /api/bookings/<id>/check`, `office_checks()` in `bookings.py`):
+
+| | |
+|---|---|
+| **✕ stops it** | the room is already taken, the room is switched off, the date has passed or is beyond the booking window, the date is blocked, there is no e-mail address to write to |
+| **! worth a look** | outside the normal bookable hours, longer than the usual limit, more people than the room holds, an outside organisation, equipment asked for, other requests for the same slot, earlier no-shows by this person |
+| **✓ fine** | everything else, with the actual value shown — the date, the length, the address the letter will go to |
+
+The same checks run again on the server when the button is pressed, so an open
+page left over from an hour ago cannot wave anything through.
+
+**The Head is e-mailed only when the office forwards a request.** In the code there
+is a single call to `mail_forwarded()`, inside `api_office()`, so this cannot happen
+by another route.
 
 ### The register — who is allowed to book
 
@@ -132,6 +187,12 @@ approval goes through exactly the same check, one request at a time.
 
 `bookings` — one row per request, from "pending" to its final state.
 `ref` is the reference number (`MA-B-2026-0001`) used in every e-mail.
+`status` is `pending` → `forwarded` → `approved` (or `returned`, `rejected`,
+`cancelled`). `confirmed` is a separate 0/1 column: `approved, confirmed = 0`
+means the Head has said yes but the office has not let it out yet, and
+`confirmed_by` / `confirmed_at` record who did and when. An approved booking
+holds the slot whether or not it is confirmed — otherwise somebody else could be
+approved into it while the office is still looking.
 
 `booking_log` — every step on every request: who did what, when, and the note.
 
@@ -155,7 +216,8 @@ for all three people.
 | the form is filled in | Your booking code: 123456 | the six-digit code (to the requester only) |
 | the request is made | Room booking MA-B-2026-0001 — … | received, waiting with the department office |
 | the office forwards it | Room booking for your approval — … | **to the Head only**, and only at this point |
-| approved | *(same subject, same thread)* | CONFIRMED, with the full details |
+| the Head approves | Approved by the HoD - please confirm — … | **to the office only.** The person who asked is told nothing yet |
+| the office confirms | *(same subject, same thread)* | CONFIRMED, with the full details and the link to give the room back |
 | rejected | *(same thread)* | NOT APPROVED, with the reason |
 | sent back | *(same thread)* | SENT BACK, with what to correct |
 | cancelled or withdrawn | *(same thread)* | CANCELLED, and the slot is free |
@@ -203,17 +265,23 @@ In console mail mode the invitation link for each is printed in the terminal.
 From the `backend` folder:
 
 ```bash
-python3 test_bookings.py     # 76 checks: the portal flow, permissions, clashes,
-                            # routing, standing approval, bulk approval, CSRF
-python3 test_public.py       # 59 checks: the register, the six-digit code, threading,
+python3 test_bookings.py     # 112 checks: the portal flow, permissions, clashes,
+                            # routing, standing approval, bulk approval, CSRF,
+                            # the office checklist, approve-a-whole-day and the
+                            # approve-then-confirm split
+python3 test_public.py       # 62 checks: the register, the six-digit code, threading,
                             # CC, what the public calendar may show, rate limits,
                             # and the two-at-a-time office account
-python3 test_extras.py       # 46 checks: the release link, no-shows, the Notice Board
+python3 test_extras.py       # 47 checks: the release link, no-shows, the Notice Board
                             # tick, the Today sheet and the availability calendar
 ```
 
-181 checks in all. They run against the real server code through the real
+221 checks in all. They run against the real server code through the real
 addresses, not mocks.
+
+Each run starts from an empty database in `backend/data-test/`, which is created
+and thrown away by the test itself. Your real `backend/data/` folder is never
+touched, and a run can never be upset by an earlier one.
 
 ---
 
@@ -268,7 +336,9 @@ access.
 
 ## 8d. Putting a seminar on the Notice Board
 
-An approved booking already holds the title, room, date and time. **Put on Notice
+A **confirmed** booking already holds the title, room, date and time. (It has to be
+confirmed by the office first: a booking the asker has not been told about yet
+should not be on a public noticeboard.) **Put on Notice
 Board** on the office queue or the Head's list turns it into an event notice, asking
 only for the speaker's name and institution. It then appears on the home page Notice
 Board, in the calendar and on News & Events, with no retyping. The roll number and

@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Contact the Department of Mathematics, IIT Kharagpur: address, phone, e-mail, map and directions."><title>Contact Us | Department of Mathematics | IIT Kharagpur</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700;800&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet"><link href="style.css?v=31" rel="stylesheet"><link rel="icon" href="favicon.svg" type="image/svg+xml"></head><body><a class="skip-link" href="#main">Skip to content</a>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700;800&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet"><link href="style.css?v=32" rel="stylesheet"><link rel="icon" href="favicon.svg" type="image/svg+xml"></head><body><a class="skip-link" href="#main">Skip to content</a>
 <header class="site-header"><div class="shell header-inner">
   <a class="brand" href="index.html" aria-label="Department of Mathematics home">
 <div class="brand-mark">
   <img
-    src="https://nptel.iitkgp.ac.in/images/logo.png"
+    src="assets/iitkgp-logo.png"
     alt="IIT Kharagpur Logo"
     width="68"
     height="68"
@@ -69,7 +69,7 @@
     <!-- Put a photo of the department building at gallery/maths-department.jpg and it appears here automatically. -->
     <figure class="contact-photo" hidden>
       <img src="gallery/maths-department.jpg" alt="Department of Mathematics building" loading="lazy"
-        onload="this.parentNode.hidden=false" onerror="this.parentNode.remove()">
+        data-show-if-loads>
       <figcaption>Department of Mathematics</figcaption>
     </figure>
     <div class="map-actions">
@@ -127,27 +127,7 @@
 </div>
 </section>
 </main><footer id="siteFooter"><div class="content footer-bottom"><span>© Department of Mathematics, IIT Kharagpur · Kharagpur – 721302, West Bengal, India</span></div></footer>
-<script src="site-config.js?v=29"></script>
-<script src="people-data.js?v=29"></script>
-<script src="footer.js?v=29"></script>
-<script>
-/* Keep the contact details identical to the footer: read them from site-config.js */
-(function(){
-  var C = window.DEPT_SITE; if (!C) return;
-  var esc = function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
-  var tel = function(n){ return 'tel:' + String(n).replace(/[^+\d]/g, ''); };
-  document.querySelectorAll('[data-site]').forEach(function(el){
-    var k = el.getAttribute('data-site');
-    if (k === 'address') {
-      if (C.address && C.address.length) el.innerHTML = C.address.map(function(l, i){ return i === 0 ? '<strong>' + esc(l) + '</strong>' : esc(l); }).join('<br>');
-      return;
-    }
-    var v = k === 'webteam_email' ? (C.webteam && C.webteam.email) : C[k];
-    var row = el.closest('li');
-    if (!v) { if (row) row.remove(); return; }
-    el.textContent = v;
-    if (/phone/.test(k)) el.href = tel(v);
-    else if (/email/.test(k)) el.href = 'mailto:' + v;
-  });
-})();
-</script><script src="main.js?v=31" defer></script></body></html>
+<script src="site-config.js?v=32"></script>
+<script src="people-data.js?v=32"></script>
+<script src="footer.js?v=32"></script>
+<script src="contact.js?v=32"></script><script src="main.js?v=32" defer></script></body></html>

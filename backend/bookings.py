@@ -94,6 +94,10 @@ CREATE TABLE IF NOT EXISTS bookings(
   notice_id INTEGER,                           -- the Notice Board entry made from this booking
   status TEXT NOT NULL DEFAULT 'pending',      -- pending|returned|forwarded|approved|rejected|cancelled
   auto INTEGER NOT NULL DEFAULT 0,             -- approved by the auto-approve rule
+  -- The Head approving is not the end of it.  The office confirms afterwards,
+  -- and only that sends the "your room is booked" e-mail.
+  confirmed INTEGER NOT NULL DEFAULT 0,        -- 1 = the office has confirmed it to the booker
+  confirmed_by INTEGER, confirmed_at TEXT,
   forwarded_by INTEGER, forwarded_at TEXT,
   decided_by INTEGER, decided_at TEXT, decision_note TEXT NOT NULL DEFAULT '',
   created TEXT NOT NULL, updated TEXT
@@ -137,6 +141,7 @@ DEFAULTS = {
     "buffer_min": 0,             # gap forced between two bookings of the same room
     "requester_types": ["faculty", "adjunct", "postdoc", "project", "scholar", "staff"],  # may book from inside the portal
     "auto_until": "",            # HoD: auto-approve only up to this date ("" = no limit)
+    "office_auto_confirm": False,  # office: confirm the moment the HoD approves, without a second click
     "tz_offset_min": 330,        # India Standard Time, for working out "today"
     "blackout": [],              # [{"from":"2026-12-24","to":"2027-01-01","reason":"Institute holidays"}]
     "public_show_name": True,    # show who booked it on the public calendar
@@ -152,6 +157,17 @@ STATUS_LABEL = {"pending": "With the office", "returned": "Returned for correcti
                 "cancelled": "Cancelled"}
 
 
+def status_label(b):
+    """
+    The words shown to a human.  'approved' alone is not the end of the road:
+    the Head approves, then the office confirms, and only the confirmation is
+    e-mailed to the person who asked.
+    """
+    if b["status"] == "approved":
+        return "Confirmed" if b["confirmed"] else "Approved by the HoD - office to confirm"
+    return STATUS_LABEL.get(b["status"], b["status"])
+
+
 NEW_COLUMNS = [
     ("requester_name", "TEXT NOT NULL DEFAULT ''"), ("requester_email", "TEXT NOT NULL DEFAULT ''"),
     ("roll", "TEXT NOT NULL DEFAULT ''"), ("phone", "TEXT NOT NULL DEFAULT ''"),
@@ -159,6 +175,7 @@ NEW_COLUMNS = [
     ("advisor_email", "TEXT NOT NULL DEFAULT ''"), ("thread_msgid", "TEXT NOT NULL DEFAULT ''"),
     ("source", "TEXT NOT NULL DEFAULT 'portal'"), ("release_hash", "TEXT NOT NULL DEFAULT ''"),
     ("no_show", "INTEGER NOT NULL DEFAULT 0"), ("notice_id", "INTEGER"),
+    ("confirmed", "INTEGER NOT NULL DEFAULT 0"), ("confirmed_by", "INTEGER"), ("confirmed_at", "TEXT"),
 ]
 NEW_ROOM_COLUMNS = [("custodian", "TEXT NOT NULL DEFAULT ''")]
 
@@ -512,7 +529,9 @@ def booking_public(b, who=False):
            "kind": (r or {})["kind"] if r else "", "date": b["on_date"], "start": b["t_start"], "end": b["t_end"],
            "title": b["title"], "purpose": b["purpose"], "attendees": b["attendees"], "needs": b["needs"],
            "outside": bool(b["outside"]), "hide_name": bool(b["hide_name"]),
-           "status": b["status"], "status_label": STATUS_LABEL.get(b["status"], b["status"]),
+           "status": b["status"], "status_label": status_label(b),
+           "confirmed": bool(b["confirmed"]),
+           "awaiting_office": b["status"] == "approved" and not b["confirmed"],
            "auto": bool(b["auto"]), "note": b["decision_note"], "created": b["created"]}
     out["advisor"] = b["advisor_name"]
     if who:
@@ -604,7 +623,10 @@ def mail_submitted(b, room):
     body = ("This room request has been received and is waiting for approval by {}.\n\n".format(with_whom)
             + details_text(b, room) +
             "\n\nNothing is booked yet. A second e-mail will follow in this same conversation\n"
-            "as soon as it has been decided.\n")
+            "as soon as it has been decided.\n"
+            + ("\nPlease note: the room is confirmed by the department office, not by the\n"
+               "Head's approval on its own. Treat the room as yours only once the\n"
+               "confirmation e-mail arrives.\n" if room["needs_hod"] else ""))
     if b["advisor_email"]:
         body += "\nThe faculty advisor named on this request has been copied in.\n"
     try:
@@ -631,6 +653,23 @@ def mail_decided(b, room, approved, note, auto=False):
                 "\n\nReason: " + (note or "no reason given") +
                 "\n\nA fresh request can be made for another room or another time.\n")
     notify_thread(b, to, cc, thread_subject(b, room), body)
+
+
+def mail_awaiting_office(b, room, how):
+    """
+    Nothing goes to the person who asked yet.  The office is told that the Head
+    has approved and that one click ("Confirm booking") will release the slot
+    and the e-mail.
+    """
+    to = office_addresses()
+    if not to:
+        return
+    notify(to, "Approved by the HoD - please confirm - " + b["ref"],
+           "The Head of the Department has approved this room request ({}).\n\n".format(how)
+           + details_text(b, room) +
+           "\n\nThe person who asked has NOT been told yet.\n"
+           "Open the portal -> Booking requests -> Ready to confirm, check the room is\n"
+           "still free, and press Confirm booking. That is what sends the confirmation.\n")
 
 
 def mail_returned(b, room, note):
@@ -850,6 +889,106 @@ def api_cancel(req, bid):
 # ---------------------------------------------------------------------------
 # 10. API - the office
 # ---------------------------------------------------------------------------
+def office_checks(b, room):
+    """
+    What the office goes through before a request leaves their desk.
+
+    Each entry is {"level": ok|warn|stop, "what": ..., "detail": ...}.
+    "stop" means it cannot be forwarded or confirmed as it stands; "warn" is
+    something to look at and decide about.
+    """
+    c = cfg()
+    out = []
+    def add(level, what, detail=""):
+        out.append({"level": level, "what": what, "detail": detail})
+
+    taken = clashes(b["room_id"], b["on_date"], b["t_start"], b["t_end"], BLOCKING, b["id"])
+    if taken:
+        add("stop", "Room free at that time", "{} already has {} from {} to {}.".format(
+            room["name"], taken[0]["ref"] or "another booking", taken[0]["t_start"], taken[0]["t_end"]))
+    else:
+        add("ok", "Room free at that time", "Nothing else is confirmed in {} then.".format(room["name"]))
+
+    if not room["active"]:
+        add("stop", "Room available this term", "{} is switched off in Rooms & halls.".format(room["name"]))
+
+    limit = (datetime.strptime(today_local(), "%Y-%m-%d") + timedelta(days=int(c["max_days_ahead"]))).strftime("%Y-%m-%d")
+    if b["on_date"] < today_local():
+        add("stop", "Date still ahead", "That date has already passed.")
+    elif b["on_date"] > limit:
+        add("stop", "Date within the booking window", "Rooms can be booked only up to {}.".format(limit))
+    else:
+        add("ok", "Date", pretty_date(b["on_date"]))
+
+    reason = in_blackout(b["on_date"])
+    if reason:
+        add("stop", "Not a blocked date", "That date is blocked ({}).".format(reason))
+
+    if mins(b["t_start"]) < mins(c["day_start"]) or mins(b["t_end"]) > mins(c["day_end"]):
+        add("warn", "Inside the bookable day", "Asked for {} to {}; rooms normally go {} to {}.".format(
+            b["t_start"], b["t_end"], c["day_start"], c["day_end"]))
+    else:
+        add("ok", "Inside the bookable day", "{} to {}".format(b["t_start"], b["t_end"]))
+
+    hours = (mins(b["t_end"]) - mins(b["t_start"])) / 60.0
+    long_form = "{:g} hour".format(hours) + ("" if hours == 1 else "s")
+    if hours > float(c["max_hours"]):
+        add("warn", "Length", long_form + " - longer than the usual {} hours.".format(c["max_hours"]))
+    else:
+        add("ok", "Length", long_form)
+
+    if b["attendees"] and room["capacity"] and b["attendees"] > room["capacity"]:
+        add("warn", "Room big enough", "{} people expected; {} holds {}.".format(
+            b["attendees"], room["name"], room["capacity"]))
+    elif b["attendees"]:
+        add("ok", "Room big enough", "{} people expected; {} holds {}.".format(
+            b["attendees"], room["name"], room["capacity"] or "?"))
+    else:
+        add("warn", "Number of people", "Not given on the request.")
+
+    to, cc = thread_people(b)
+    if not to:
+        add("stop", "Address to write to", "No e-mail address for the person who asked, "
+                                           "so no confirmation can be sent.")
+    else:
+        add("ok", "Address to write to", to + ((" (copy to " + ", ".join(cc) + ")") if cc else ""))
+
+    if b["needs"]:
+        add("warn", "What they asked for", b["needs"] + (
+            "   |   the room has: " + room["facilities"] if room["facilities"] else ""))
+    if b["outside"]:
+        add("warn", "Outside organisation", "Somebody from outside the Institute is involved.")
+
+    comp = clashes(b["room_id"], b["on_date"], b["t_start"], b["t_end"], WAITING, b["id"])
+    if comp:
+        add("warn", "Other requests for the same slot",
+            ", ".join((x["ref"] or "#" + str(x["id"])) + " (" + user_label(x["user_id"]) + ")" for x in comp))
+
+    n = no_show_count(b["requester_email"])
+    if n:
+        add("warn", "Earlier no-shows", "{} earlier booking(s) by this person were not used.".format(n))
+    return out
+
+
+def blockers(b, room):
+    return [c for c in office_checks(b, room) if c["level"] == "stop"]
+
+
+def api_office_check(req, bid):
+    """The checklist the office sees before forwarding or confirming."""
+    require_office(req)
+    b = booking_row(int(bid))
+    room = room_row(b["room_id"])
+    checks = office_checks(b, room)
+    ok, why = auto_check(b, room)
+    return {"booking": booking_public(b, who=True), "room": room_public(room), "checks": checks,
+            "stop": any(c["level"] == "stop" for c in checks),
+            "warn": sum(1 for c in checks if c["level"] == "warn"),
+            "needs_hod": bool(room["needs_hod"]),
+            "auto": {"ok": ok, "why": why},
+            "office_auto_confirm": bool(cfg()["office_auto_confirm"])}
+
+
 def api_queue(req):
     require_office(req)
     rows = S.q("SELECT * FROM bookings WHERE status IN ('pending','returned','forwarded')"
@@ -863,13 +1002,26 @@ def api_queue(req):
                              for x in clashes(b["room_id"], b["on_date"], b["t_start"], b["t_end"], WAITING, b["id"])]
         item["conflict"] = bool(clashes(b["room_id"], b["on_date"], b["t_start"], b["t_end"], BLOCKING, b["id"]))
         out.append(item)
-    upcoming = S.q("SELECT * FROM bookings WHERE status='approved' AND on_date>=?"
+    # Approved by the Head, but the person who asked has not been told yet.
+    # Confirming is the office's job and it is what sends the e-mail.
+    ready = S.q("SELECT * FROM bookings WHERE status='approved' AND confirmed=0"
+                " ORDER BY on_date, t_start").fetchall()
+    to_confirm = []
+    for b in ready:
+        item = booking_public(b, who=True)
+        item["conflict"] = bool(clashes(b["room_id"], b["on_date"], b["t_start"], b["t_end"], BLOCKING, b["id"]))
+        item["past"] = b["on_date"] < today_local()
+        to_confirm.append(item)
+    upcoming = S.q("SELECT * FROM bookings WHERE status='approved' AND confirmed=1 AND on_date>=?"
                    " ORDER BY on_date, t_start LIMIT 100", (today_local(),)).fetchall()
-    return {"queue": out, "upcoming": [booking_public(b, who=True) for b in upcoming],
+    return {"queue": out, "to_confirm": to_confirm,
+            "upcoming": [booking_public(b, who=True) for b in upcoming],
             "no_address": missing_addresses(), "register": register_size(),
+            "office_auto_confirm": bool(cfg()["office_auto_confirm"]),
             "counts": {"pending": sum(1 for b in rows if b["status"] == "pending"),
                        "forwarded": sum(1 for b in rows if b["status"] == "forwarded"),
-                       "returned": sum(1 for b in rows if b["status"] == "returned")}}
+                       "returned": sum(1 for b in rows if b["status"] == "returned"),
+                       "to_confirm": len(to_confirm)}}
 
 
 def api_office(req, bid):
@@ -880,8 +1032,12 @@ def api_office(req, bid):
     action = str(d.get("action") or "")
     note = text(d.get("note"), 500, "The note")
     room = room_row(b["room_id"])
-    # hall requests go straight to the Head, but the office can still send one back
-    # or refuse it outright before he gets to it.
+    # The Head has approved it and it is sitting in "Ready to confirm". This is
+    # the office letting it out: it sets confirmed=1 and sends the e-mail.
+    if action == "confirm" and b["status"] == "approved" and not b["confirmed"]:
+        return confirm_booking(req, b, u, note)
+    # Otherwise it is still an open request. The office can send it back or
+    # refuse it even after it has gone to the Head.
     if b["status"] not in ("pending", "returned", "forwarded"):
         raise S.ApiError(400, "That request has already been decided.")
     if b["status"] == "forwarded" and action not in ("return", "reject"):
@@ -902,6 +1058,14 @@ def api_office(req, bid):
         S.audit(u["email"], "booking.reject", b["ref"], note, req.ip)
         mail_decided(booking_row(b["id"]), room, False, note)
         return {"ok": True, "status": "rejected"}
+
+    if action in ("confirm", "forward"):
+        # Details and availability are checked here as well as in the browser,
+        # so nothing can be waved through by a stale page.
+        stop = blockers(b, room)
+        if stop:
+            raise S.ApiError(409, "This cannot go forward yet. " +
+                             "  ".join(c["what"] + ": " + c["detail"] for c in stop))
 
     if action == "confirm":
         if room["needs_hod"]:
@@ -927,13 +1091,22 @@ def api_office(req, bid):
 # ---------------------------------------------------------------------------
 # 11. API - the Head of the Department
 # ---------------------------------------------------------------------------
-def approve(req, b, u, note, auto=False, by_office=False):
+def approve(req, b, u, note, auto=False, by_office=False, confirm_now=None):
     """
     The only place a booking becomes 'approved'.
     The slot is re-checked inside a locked transaction, so two people can never
     be approved into the same room at the same time.
+
+    Approving is NOT the end of it.  Unless the office has switched on
+    "confirm as soon as the HoD approves", the booking lands in the office's
+    "Ready to confirm" tray and nothing is sent to the person who asked until
+    the office presses Confirm booking - see confirm_booking() below.
     """
     room = room_row(b["room_id"])
+    if confirm_now is None:
+        # A room that does not need the Head is the office's own to confirm, so
+        # pressing Confirm there is both the approval and the confirmation.
+        confirm_now = True if (by_office and not room["needs_hod"]) else bool(cfg()["office_auto_confirm"])
     at = S.iso(S.now())
     S.q("BEGIN IMMEDIATE")
     try:
@@ -946,8 +1119,11 @@ def approve(req, b, u, note, auto=False, by_office=False):
             S.q("ROLLBACK")
             raise S.ApiError(409, "{} was booked for that slot a moment ago by {}. "
                                   "This request cannot be approved.".format(room["name"], user_label(taken[0]["user_id"])))
-        S.q("UPDATE bookings SET status='approved',decided_by=?,decided_at=?,decision_note=?,auto=?,updated=? WHERE id=?",
-            (u["id"], at, note, 1 if auto else 0, at, b["id"]))
+        S.q("UPDATE bookings SET status='approved',decided_by=?,decided_at=?,decision_note=?,auto=?,"
+            "confirmed=?,confirmed_by=?,confirmed_at=?,updated=? WHERE id=?",
+            (u["id"], at, note, 1 if auto else 0,
+             1 if confirm_now else 0, u["id"] if confirm_now else None, at if confirm_now else None,
+             at, b["id"]))
         S.q("COMMIT")
     except S.ApiError:
         raise
@@ -955,12 +1131,45 @@ def approve(req, b, u, note, auto=False, by_office=False):
         S.q("ROLLBACK")
         raise
     b = booking_row(b["id"])
-    log(b["id"], u["email"], "approved automatically" if auto else
-        ("confirmed by office" if by_office else "approved by HoD"), note)
+    how = ("approved automatically under the Head's standing approval" if auto else
+           ("confirmed by office" if by_office else "approved by HoD"))
+    log(b["id"], u["email"], how, note)
     S.audit(u["email"], "booking.approve", b["ref"],
             "{} {} {}-{}{}".format(room["name"], b["on_date"], b["t_start"], b["t_end"], " (auto)" if auto else ""), req.ip)
-    mail_decided(b, room, True, note, auto=auto)
-    return {"ok": True, "status": "approved", "auto": auto}
+    if confirm_now:
+        if not (by_office and not room["needs_hod"]):
+            log(b["id"], u["email"], "confirmed straight away (office setting)")
+        mail_decided(b, room, True, note, auto=auto)
+    else:
+        mail_awaiting_office(b, room, how)
+    return {"ok": True, "status": "approved", "auto": auto, "confirmed": bool(confirm_now),
+            "status_label": status_label(b)}
+
+
+def confirm_booking(req, b, u, note=""):
+    """
+    The office releasing a booking the Head has approved.  This - and only this -
+    sends the confirmation: to the person who asked, copy to the office and to
+    the faculty advisor when one was named.
+    """
+    room = room_row(b["room_id"])
+    if b["status"] != "approved":
+        raise S.ApiError(400, "Only a request the Head has approved can be confirmed.")
+    if b["confirmed"]:
+        raise S.ApiError(400, "That booking has already been confirmed.")
+    taken = clashes(b["room_id"], b["on_date"], b["t_start"], b["t_end"], BLOCKING, b["id"])
+    if taken:
+        raise S.ApiError(409, "{} now has {} in that slot. Take one of the two back first.".format(
+            room["name"], taken[0]["ref"] or "another confirmed booking"))
+    at = S.iso(S.now())
+    S.q("UPDATE bookings SET confirmed=1,confirmed_by=?,confirmed_at=?,updated=? WHERE id=?",
+        (u["id"], at, at, b["id"]))
+    b = booking_row(b["id"])
+    log(b["id"], u["email"], "confirmed by office", note)
+    S.audit(u["email"], "booking.confirm", b["ref"],
+            "{} {} {}-{}".format(room["name"], b["on_date"], b["t_start"], b["t_end"]), req.ip)
+    mail_decided(b, room, True, note or b["decision_note"], auto=bool(b["auto"]))
+    return {"ok": True, "status": "approved", "confirmed": True, "status_label": status_label(b)}
 
 
 def api_hod(req):
@@ -976,9 +1185,20 @@ def api_hod(req):
                              for x in clashes(b["room_id"], b["on_date"], b["t_start"], b["t_end"], WAITING, b["id"])]
         item["room_capacity"] = room["capacity"]
         out.append(item)
-    return {"waiting": out,
+    # Approved by the Head, not yet let out by the office. The Head should be
+    # able to see this without asking anybody.
+    unconfirmed = S.q("SELECT * FROM bookings WHERE status='approved' AND confirmed=0"
+                      " ORDER BY on_date, t_start").fetchall()
+    # dates with something waiting, so "approve everything on this day" is one click
+    days = []
+    for d in sorted(set(b["on_date"] for b in waiting)):
+        days.append({"date": d, "pretty": pretty_date(d),
+                     "count": sum(1 for b in waiting if b["on_date"] == d)})
+    return {"waiting": out, "days": days,
+            "awaiting_office": [booking_public(b, who=True) for b in unconfirmed],
             "recent": [booking_public(b, who=True) for b in recent],
             "rooms": [room_public(r) for r in S.q("SELECT * FROM rooms ORDER BY sort, name").fetchall()],
+            "office_auto_confirm": bool(c["office_auto_confirm"]),
             "auto_until": c["auto_until"], "max_hours": c["max_hours"], "today": today_local()}
 
 
@@ -1010,6 +1230,11 @@ def api_decide_many(req):
     action = str(d.get("action") or "")
     note = text(d.get("note"), 500, "The note")
     ids = [int(x) for x in (d.get("ids") or [])][:100]
+    day = str(d.get("date") or "").strip()
+    if day and not ids:
+        # "approve everything waiting for this date"
+        ids = [r["id"] for r in S.q("SELECT id FROM bookings WHERE status='forwarded' AND on_date=?"
+                                    " ORDER BY t_start", (ymd(day),)).fetchall()][:100]
     done, failed = [], []
     for i in ids:
         try:
@@ -1046,7 +1271,12 @@ def api_revoke(req, bid):
         (note, S.iso(S.now()), b["id"]))
     log(b["id"], u["email"], "withdrawn after approval", note)
     S.audit(u["email"], "booking.revoke", b["ref"], note, req.ip)
-    mail_cancelled(booking_row(b["id"]), room_row(b["room_id"]), user_label(u["id"]), note)
+    if b["confirmed"]:
+        mail_cancelled(booking_row(b["id"]), room_row(b["room_id"]), user_label(u["id"]), note)
+    else:
+        # never confirmed, so the person was never told it was approved:
+        # telling them it is cancelled would be the first they heard of it.
+        mail_decided(booking_row(b["id"]), room_row(b["room_id"]), False, note)
     return {"ok": True}
 
 
@@ -1356,8 +1586,8 @@ def api_publish_notice(req, bid):
     if not (may_office(u) or may_hod(u)):
         raise S.ApiError(403, "Only the department office or the Head can publish a notice.")
     b = booking_row(int(bid))
-    if b["status"] != "approved":
-        raise S.ApiError(400, "Only a confirmed booking can be published.")
+    if b["status"] != "approved" or not b["confirmed"]:
+        raise S.ApiError(400, "Only a booking the office has confirmed can be published.")
     if b["notice_id"] and S.q1("SELECT id FROM notices WHERE id=?", (b["notice_id"],)):
         raise S.ApiError(400, "This booking is already on the Notice Board.")
     room = room_row(b["room_id"])
@@ -1400,7 +1630,7 @@ def api_today(req):
             "ref": b["ref"], "start": b["t_start"], "end": b["t_end"], "title": b["title"],
             "by": b["advisor_name"] or b["requester_name"], "requester": b["requester_name"],
             "phone": b["phone"], "needs": b["needs"], "attendees": b["attendees"],
-            "no_show": bool(b["no_show"]), "id": b["id"]})
+            "no_show": bool(b["no_show"]), "confirmed": bool(b["confirmed"]), "id": b["id"]})
     return {"date": day, "pretty": pretty_date(day), "rooms": rooms, "bookings": by_room,
             "total": len(rows), "blackout": in_blackout(day)}
 
@@ -1465,12 +1695,29 @@ def api_room_delete(req, rid):
 
 
 def api_settings(req):
-    """The HoD's auto-approve ticks and the general booking rules."""
+    """
+    The HoD's auto-approve ticks and the general booking rules.
+
+    One key is the office's own: "office_auto_confirm".  With it on, a booking
+    goes out to the person who asked the moment the Head approves, with no
+    second click from the office.  With it off (the default) every approval
+    waits in "Ready to confirm".
+    """
     u = S.require_ready_user(req)
-    if not (may_hod(u) or u["role"] == "admin"):
-        raise S.ApiError(403, "Only the Head of the Department or an admin can change these.")
+    boss = may_hod(u) or u["role"] == "admin"
+    if not (boss or may_office(u)):
+        raise S.ApiError(403, "Only the department office, the Head or an admin can change these.")
     d = req.json()
     changes = {}
+    if "office_auto_confirm" in d:
+        changes["office_auto_confirm"] = bool(d.get("office_auto_confirm"))
+    if not boss:
+        if set(d) - {"office_auto_confirm"}:
+            raise S.ApiError(403, "Only the Head of the Department or an admin can change the other "
+                                  "booking rules. The office can set when bookings are confirmed.")
+        save_cfg(changes)
+        S.audit(u["email"], "booking.settings", "", "office_auto_confirm", req.ip)
+        return {"ok": True, "office_auto_confirm": changes["office_auto_confirm"]}
     if "auto_rooms" in d:                       # [room id, ...] the HoD lets through
         want = set(int(x) for x in (d.get("auto_rooms") or []))
         for r in S.q("SELECT id FROM rooms").fetchall():
@@ -1547,6 +1794,7 @@ ROUTE_TABLE = [
     ("GET",    r"/api/bookings/availability",  api_availability),
     ("GET",    r"/api/bookings/mine",          api_mine),
     ("GET",    r"/api/bookings/queue",         api_queue),
+    ("GET",    r"/api/bookings/(\d+)/check",    api_office_check),
     ("GET",    r"/api/bookings/hod",           api_hod),
     ("GET",    r"/api/bookings/today",         api_today),
     ("POST",   r"/api/bookings/(\d+)/no-show", api_no_show),

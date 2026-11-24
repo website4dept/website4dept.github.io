@@ -30,6 +30,24 @@ server if you are running that).
    the file name does not match exactly (capital letters count), the file is not in
    `gallery/`, or your browser cached the old file — see **Making a change show up** below.
 
+### The IIT Kharagpur logo in the top-left corner
+
+Every page looks for the logo at **`assets/iitkgp-logo.png`** first. That file is
+not in the folder yet, so until you add it the pages quietly fall back to the copy
+on the Institute's NPTEL server — which is how the site worked before, but it is
+slower and it depends on somebody else's server staying up.
+
+To fix that for good:
+
+1. Save the official logo as a PNG, about 200 × 200 pixels, transparent background.
+2. Name it exactly `iitkgp-logo.png`.
+3. Put it in the `assets/` folder.
+4. Nothing else to change. Every page picks it up straight away.
+
+(Then, if you like: in `backend/server.py` find `CSP` and delete
+`https://nptel.iitkgp.ac.in` from the `img-src` line. The site stops talking to
+any outside server for images at all.)
+
 ### A photo for a person
 
 Put it in **`photos/`** named after their profile id: `photos/ratna-dutta.jpg`.
@@ -150,6 +168,39 @@ can see what is left to do.
 | Make someone a booking office staff member | Portal → **Accounts** → Change role → `office`. One shared account is normal: two people may be signed in at once, and a third sign-in ends the oldest session |
 | Make someone the Head for approvals | Portal → **Accounts** → Change role → `hod` |
 
+### Who presses what, now that approval and confirmation are separate
+
+A room is **not** booked the moment the Head approves it. There are two steps:
+
+1. **The Head approves.** Nothing is sent to anybody. The request moves into the
+   office's **Ready to confirm** list.
+2. **The office presses Confirm booking.** *That* is what e-mails the person who
+   asked, with a copy to the office and to the faculty advisor if one was named.
+
+This is on purpose: only the office knows about the key, a late clash or the
+furniture. If you would rather it went out straight away, the office can tick
+**"Confirm as soon as the Head approves"** at the bottom of Portal → Booking
+requests. It is off to begin with and can be switched back at any time.
+
+Three places tell you where something is stuck:
+
+* Portal → **Booking requests** — two counters at the top: *with the Head, not yet
+  approved*, and *approved — ready for you to confirm*.
+* Portal → **Approvals** (the Head) — a table, *Approved by you — waiting for the
+  office to confirm*.
+* Portal → **System health** (admin) — warns if anything has sat unconfirmed for
+  more than two days.
+
+### Before forwarding: the checklist
+
+Pressing **Check & forward** (or **Check & confirm**) opens a short list before
+anything happens: is the room really free, is the date inside the booking window,
+is the room big enough, is there an e-mail address to write to, is anyone else
+asking for the same slot, has this person failed to turn up before. A red ✕ stops
+the request going further; an amber ! is for you to judge. The same checks run
+again on the server when you press the button, so a page left open for an hour
+cannot wave anything through.
+
 ### Change the working hours, how far ahead people may book, or blocked dates
 
 These are settings, not code. Until a settings screen is added in a later stage,
@@ -191,8 +242,35 @@ bookings.save_cfg({'max_per_hour': 5, 'code_minutes': 15})
 "
 ```
 
+To make every approval go out immediately, without the office confirming
+(the same thing as the tick box described above):
+
+```bash
+python3 -c "
+import server, bookings
+bookings.save_cfg({'office_auto_confirm': True})
+"
+```
+
 The defaults for all of these are listed in `DEFAULTS` at the top of
 `backend/bookings.py`.
+
+---
+
+## Backups — the one thing to set up and then forget
+
+The portal already copies its own database into `backend/data/backups/` every six
+hours and keeps the last fourteen. That saves you from a mistake, but **not** from
+the machine itself: if the disk fails, those copies go with it.
+
+`deploy/backup-offsite.sh` copies a backup somewhere else. Open it, change the few
+lines at the top (where the files should go), run it once by hand to check it
+works, then add the single cron line printed in its own comments. Portal → **System
+health** will keep saying *"Copy kept off this machine: never run"* until you do,
+and will start warning again if it ever stops.
+
+There is also a manual download: Portal → **Backup & restore**. Worth doing before
+any big change.
 
 ---
 
@@ -204,13 +282,17 @@ the website looks the same afterwards, the browser is showing you the old copy.
 Every page links to them with a version number:
 
 ```html
-<link href="style.css?v=23" rel="stylesheet">
-<script src="main.js?v=23"></script>
+<link href="style.css?v=32" rel="stylesheet">
+<script src="main.js?v=32"></script>
 ```
 
 **Whenever you edit a `.css` or `.js` file, raise that number by one in every HTML
 file that links to it.** They should all carry the same number, so the quickest
-way is to search all the HTML files for `?v=23` and replace it with `?v=24`.
+way is to search all the HTML files for `?v=32` and replace it with `?v=33`.
+
+In VS Code: Edit → Replace in Files (Ctrl+Shift+H), search `?v=32`, replace
+`?v=33`, press "Replace All". Every page must end up with the same number — if one
+page is left behind, that page alone keeps showing the old styling.
 
 Editing a `-data.js` file (gallery, people, notices, students) counts too.
 

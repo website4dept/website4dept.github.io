@@ -1,7 +1,18 @@
 """Release-the-room link, no-show marking, the Notice Board tick and the today sheet."""
-import contextlib, email, email.policy, io, json, os, re, sys
+import contextlib, email, email.policy, io, json, os, re, shutil, sys
 BACKEND = os.path.dirname(os.path.abspath(__file__))
 os.chdir(BACKEND); sys.path.insert(0, BACKEND)
+# Every run starts from an empty database in a folder of its own, so one run can
+# never be upset by an earlier one and the real data/ folder is never touched.
+DATA = "data-test"
+shutil.rmtree(os.path.join(BACKEND, DATA), ignore_errors=True)
+os.makedirs(os.path.join(BACKEND, DATA))
+_cfg = json.load(open(os.path.join(BACKEND, "config.example.json")))
+_cfg["data_dir"] = DATA
+_cfg["mail"]["mode"] = "console"
+_path = os.path.join(BACKEND, DATA, "config.json")
+json.dump(_cfg, open(_path, "w"))
+os.environ["PORTAL_CONFIG"] = _path
 import server, bookings
 
 PASS = FAIL = 0
@@ -36,8 +47,8 @@ def set_email(pid, e):
 
 def mails(n=6):
     out = []
-    for f in sorted(os.listdir("data/outbox"))[-n:]:
-        with open("data/outbox/" + f, "rb") as fh:
+    for f in sorted(os.listdir(DATA + "/outbox"))[-n:]:
+        with open(DATA + "/outbox/" + f, "rb") as fh:
             m = email.message_from_binary_file(fh, policy=email.policy.default)
         try: body = m.get_body(preferencelist=("plain",)).get_content()
         except Exception: body = ""
@@ -76,6 +87,8 @@ def book(a, b2, title, room=None):
 B, REF = book("10:00", "12:00", "Invited seminar on elliptic curves")
 s, d = call("POST", "/api/bookings/%d/decide" % B, {"action": "approve"}, sid="sh", csrf="csh")
 check("approved", s == 200, (s, d))
+s, d = call("POST", "/api/bookings/%d/office" % B, {"action": "confirm"}, sid="so", csrf="cso")
+check("and confirmed by the office", s == 200 and d.get("confirmed"), (s, d))
 
 print("\n--- giving the room back from the e-mail ---")
 conf = [m for m in mails(4) if "CONFIRMED" in m]
@@ -100,6 +113,7 @@ check("a made-up token is refused", s == 404, s)
 B2, REF2 = book("10:00", "12:00", "Second seminar in the freed slot")
 check("the freed slot can be booked again", bool(B2))
 call("POST", "/api/bookings/%d/decide" % B2, {"action": "approve"}, sid="sh", csrf="csh")
+call("POST", "/api/bookings/%d/office" % B2, {"action": "confirm"}, sid="so", csrf="cso")
 
 print("\n--- rooms nobody turned up to ---")
 s, d = call("POST", "/api/bookings/%d/no-show" % B2, {}, sid="so", csrf="cso")
