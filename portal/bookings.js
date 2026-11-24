@@ -19,6 +19,20 @@
   let P = null;                                   // the portal helpers, set on first use
   const ready = () => (P = P || window.PORTAL);
 
+  /* The admin account can see every booking screen but decide nothing on it -
+     the reasoning is in the note at the top of backend/bookings.py. These say
+     whether the buttons should be drawn at all. The server checks again
+     anyway, so a page left open cannot get round it. */
+  const canOffice = () => ready().me().role === 'office';
+  const canHod    = () => ready().me().role === 'hod';
+  const watchOnly = () => ready().me().role === 'admin';
+  const watchNote = whose =>
+    !watchOnly() ? '' :
+    '<div class="bk-watch"><strong>You are signed in as the admin.</strong> ' +
+    'You can see everything on this page, but deciding a booking needs the ' + whose + '. ' +
+    'You can still withdraw a confirmed booking, because that frees a room rather than ' +
+    'claiming one and everybody involved is told.</div>';
+
   /* ---------- small helpers ---------- */
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const STATE_CLASS = {approved: 'st-active', pending: 'st-pending', forwarded: 'st-pending',
@@ -41,27 +55,30 @@
     try { d = await api('GET', '/bookings/' + id + '/check'); }
     catch (err){ box.innerHTML = ''; return toast(err.message, true); }
     const b = d.booking;
+    // 'look' is the read-only form: the same checklist with nothing to press.
     const label = next === 'forward' ? 'Forward to the Head' : 'Confirm booking';
     box.innerHTML =
-      '<div class="card bk-check"><h3>Before you ' +
-        (next === 'forward' ? 'forward' : 'confirm') + ': ' + esc(b.ref) + '</h3>' +
+      '<div class="card bk-check"><h3>' +
+        (next === 'look' ? 'Checklist for ' : next === 'forward' ? 'Before you forward: '
+                                                                : 'Before you confirm: ') + esc(b.ref) + '</h3>' +
       '<p class="hint"><strong>' + esc(b.room) + '</strong> · ' + when(b) + ' · ' +
         esc(b.title) + ' · asked by ' + esc(b.by) + '</p>' +
       '<ul class="bk-checklist">' + d.checks.map(c =>
         '<li class="is-' + c.level + '"><span class="bk-mark">' + MARK[c.level] + '</span>' +
         '<span><strong>' + esc(c.what) + '</strong>' +
         (c.detail ? '<small>' + esc(c.detail) + '</small>' : '') + '</span></li>').join('') + '</ul>' +
-      (next === 'forward' && d.auto && d.auto.ok
+      (next !== 'confirm' && d.auto && d.auto.ok
         ? '<p class="hint">The Head’s standing approval covers this one, so forwarding approves it ' +
           'at once' + (d.office_auto_confirm ? ' and it goes straight out to the person who asked.'
                                              : ' and it then waits here for you to confirm.') + '</p>'
         : '') +
       (d.stop
-        ? '<p class="bk-warn">This cannot go forward as it stands. Send it back for correction, or refuse it.</p>'
+        ? '<p class="bk-warn">This cannot go forward as it stands.' +
+          (next === 'look' ? '' : ' Send it back for correction, or refuse it.') + '</p>'
         : '') +
       '<div class="view-actions">' +
-        (d.stop ? '' : '<button class="btn btn-maroon" data-go="' + id + '" data-next="' + next + '">' +
-                       label + '</button>') +
+        (d.stop || next === 'look' ? ''
+          : '<button class="btn btn-maroon" data-go="' + id + '" data-next="' + next + '">' + label + '</button>') +
         '<button class="btn btn-light" id="bkCheckClose">Close</button></div></div>';
     $('#bkCheckClose').addEventListener('click', () => { box.innerHTML = ''; });
     const go = box.querySelector('[data-go]');
@@ -258,11 +275,15 @@
       '<td class="actions">' +
         (b.status === 'forwarded'
           ? '<small class="bk-withhod">with the Head — his approval is still pending</small>'
-          : '<button class="btn btn-maroon btn-sm" data-check="' + b.id + '" data-next="' +
-            (b.needs_hod ? 'forward' : 'confirm') + '">Check &amp; ' +
-            (b.needs_hod ? 'forward' : 'confirm') + '</button>') +
-        '<button class="btn btn-light btn-sm" data-act="return" data-id="' + b.id + '">Return</button>' +
-        '<button class="btn btn-danger btn-sm" data-act="reject" data-id="' + b.id + '">Reject</button>' +
+          : (canOffice()
+              ? '<button class="btn btn-maroon btn-sm" data-check="' + b.id + '" data-next="' +
+                (b.needs_hod ? 'forward' : 'confirm') + '">Check &amp; ' +
+                (b.needs_hod ? 'forward' : 'confirm') + '</button>'
+              : '<button class="btn btn-light btn-sm" data-check="' + b.id + '" data-next="look">See the checklist</button>')) +
+        (canOffice()
+          ? '<button class="btn btn-light btn-sm" data-act="return" data-id="' + b.id + '">Return</button>' +
+            '<button class="btn btn-danger btn-sm" data-act="reject" data-id="' + b.id + '">Reject</button>'
+          : '') +
       '</td></tr>';
 
     const warn = (d.no_address || []).length
@@ -287,7 +308,9 @@
         (b.conflict ? '<br><small class="bk-warn">clashes with another confirmed booking</small>' : '') +
         (b.past ? '<br><small class="bk-warn">that date has passed</small>' : '') + '</td>' +
       '<td class="actions">' +
-        '<button class="btn btn-maroon btn-sm" data-check="' + b.id + '" data-next="confirm">Check &amp; confirm</button>' +
+        (canOffice()
+          ? '<button class="btn btn-maroon btn-sm" data-check="' + b.id + '" data-next="confirm">Check &amp; confirm</button>'
+          : '<button class="btn btn-light btn-sm" data-check="' + b.id + '" data-next="look">See the checklist</button>') +
         '<button class="btn btn-danger btn-sm" data-revoke="' + b.id + '">Withdraw</button></td></tr>';
 
     $('#view').innerHTML = head('Booking requests',
@@ -295,7 +318,7 @@
         'then forward a seminar hall to the Head of the Department or confirm a classroom yourself. ' +
         'The Head is only e-mailed once you forward. When he approves, the booking comes back to you ' +
         'in “Ready to confirm” — nothing reaches the person who asked until you confirm it.') +
-      empty + warn +
+      watchNote('department office account') + empty + warn +
       '<div class="stat-grid">' +
         '<div class="stat-card"><strong>' + c.pending + '</strong><span>waiting for you</span></div>' +
         '<div class="stat-card"><strong>' + c.forwarded + '</strong><span>with the Head, not yet approved</span></div>' +
@@ -316,7 +339,7 @@
           : '<tr><td colspan="6"><small>Nothing is waiting to be confirmed.</small></td></tr>') +
         '</tbody></table></div>' +
       '<div class="card bk-switch"><label class="check"><input type="checkbox" id="bkAutoConfirm"' +
-        (d.office_auto_confirm ? ' checked' : '') + '> ' +
+        (d.office_auto_confirm ? ' checked' : '') + (canOffice() ? '' : ' disabled') + '> ' +
         '<span><strong>Confirm as soon as the Head approves</strong>' +
         '<small>With this on, an approval goes straight out to the person who asked and nothing waits here. ' +
         'With it off (the usual setting) every approval comes back to you first.</small></span></label></div>' +
@@ -327,9 +350,15 @@
           '<td>' + esc(b.title) + (b.auto ? ' <small>(auto-approved)</small>' : '') + '</td><td>' + esc(b.by) + '</td>' +
           '<td class="actions">' +
           (b.on_board ? '<small>on the Notice Board</small>'
-                      : '<button class="btn btn-light btn-sm" data-notice="' + b.id + '">Put on Notice Board</button>') +
-          '<button class="btn btn-light btn-sm" data-ns="' + b.id + '">' +
-            (b.no_show ? 'Not used ✓' : 'Mark not used') + '</button>' +
+                      : (b.confirmed
+                          ? (canOffice() || canHod()
+                              ? '<button class="btn btn-light btn-sm" data-notice="' + b.id + '">Put on Notice Board</button>'
+                              : '')
+                          : '<small>confirm it first</small>')) +
+          (canOffice() || canHod()
+            ? '<button class="btn btn-light btn-sm" data-ns="' + b.id + '">' +
+              (b.no_show ? 'Not used ✓' : 'Mark not used') + '</button>'
+            : (b.no_show ? '<small>not used</small>' : '')) +
           '<button class="btn btn-danger btn-sm" data-revoke="' + b.id + '">Withdraw</button></td></tr>').join('')
           : '<tr><td colspan="5"><small>Nothing confirmed yet.</small></td></tr>') +
         '</tbody></table></div>';
@@ -414,8 +443,11 @@
                 (b.needs ? '<small>Needs: ' + esc(b.needs) + '</small>' : '') + '</span>' +
               '<span class="td-who">' + esc(b.by || '') +
                 (b.phone ? '<small>☎ ' + esc(b.phone) + '</small>' : '') + '</span>' +
-              '<span class="td-act"><button type="button" class="btn btn-light btn-sm" data-ns="' + b.id + '">' +
-                (b.no_show ? 'Not used ✓' : 'Mark not used') + '</button></span></li>').join('') + '</ul>'
+              '<span class="td-act">' + (canOffice() || canHod()
+                ? '<button type="button" class="btn btn-light btn-sm" data-ns="' + b.id + '">' +
+                  (b.no_show ? 'Not used ✓' : 'Mark not used') + '</button>'
+                : (b.no_show ? '<small>not used</small>' : '')) +
+              '</span></li>').join('') + '</ul>'
           : '<p class="td-free">Free all day</p>') +
       '</section>';
     };
@@ -447,6 +479,169 @@
   }
 
   /* =====================================================================
+     2c. Booking records   (the office, the Head and the admin)
+
+     Every booking ever made, whatever became of it. This is where you answer
+     "what happened to MA-B-2026-0042?" months later. Search covers the
+     reference number, the name, the e-mail address, the roll number, the
+     phone number, the purpose and the room.
+     ===================================================================== */
+  const REC = {q: '', status: 'all', room: '', from: '', to: '', sort: 'date', dir: 'desc', page: 1, open: 0};
+
+  function recQuery(){
+    const p = [];
+    if (REC.q) p.push('q=' + encodeURIComponent(REC.q));
+    if (REC.status && REC.status !== 'all') p.push('status=' + encodeURIComponent(REC.status));
+    if (REC.room) p.push('room=' + encodeURIComponent(REC.room));
+    if (REC.from) p.push('from=' + encodeURIComponent(REC.from));
+    if (REC.to) p.push('to=' + encodeURIComponent(REC.to));
+    p.push('sort=' + REC.sort, 'dir=' + REC.dir, 'page=' + REC.page);
+    return '?' + p.join('&');
+  }
+
+  async function viewRecords(arg){
+    const {api, head, $, $$, toast} = ready();
+    // #bkrecords/42 opens that booking's record straight away, so a reference
+    // number can be passed around as a link.
+    if (arg && /^\d+$/.test(String(arg))) REC.open = Number(arg);
+    const d = await api('GET', '/bookings/records' + recQuery());
+
+    const arrow = key => REC.sort !== key ? '' : (REC.dir === 'asc' ? ' ▲' : ' ▼');
+    const th = (key, label) =>
+      '<th><button type="button" class="rec-sort' + (REC.sort === key ? ' is-on' : '') +
+      '" data-sort="' + key + '">' + label + arrow(key) + '</button></th>';
+
+    const row = b =>
+      '<tr class="rec-row' + (REC.open === b.id ? ' is-open' : '') + '" data-open="' + b.id + '">' +
+      '<td><strong>' + esc(b.ref || '—') + '</strong></td>' +
+      '<td>' + when(b) + '</td>' +
+      '<td>' + esc(b.room) + '</td>' +
+      '<td>' + esc(b.title) + '</td>' +
+      '<td>' + esc(b.by) + (b.roll ? '<br><small>Roll ' + esc(b.roll) + '</small>' : '') + '</td>' +
+      '<td>' + chip(b) + '</td></tr>' +
+      (REC.open === b.id ? '<tr class="rec-detail"><td colspan="6" id="recDetail">' +
+        '<p class="hint">Loading…</p></td></tr>' : '');
+
+    const first = d.total ? (d.page - 1) * d.per_page + 1 : 0;
+    const last = Math.min(d.page * d.per_page, d.total);
+
+    $('#view').innerHTML = head('Booking records',
+        'Every room request ever made, whatever became of it. Search by reference number, ' +
+        'name, e-mail address, roll number, phone number, purpose or room. Click any row to ' +
+        'see everything that happened to that booking and who did it.') +
+      '<form class="rec-bar" id="recForm">' +
+        '<input type="search" id="recQ" placeholder="MA-B-2026-0042, a name, a roll number…" ' +
+          'value="' + esc(REC.q) + '" aria-label="Search the booking records">' +
+        '<select id="recRoom" aria-label="Room"><option value="">Every room</option>' +
+          d.rooms.map(r => '<option value="' + r.id + '"' + (String(REC.room) === String(r.id) ? ' selected' : '') +
+            '>' + esc(r.name) + '</option>').join('') + '</select>' +
+        '<label>From <input type="date" id="recFrom" value="' + esc(REC.from) + '"></label>' +
+        '<label>To <input type="date" id="recTo" value="' + esc(REC.to) + '"></label>' +
+        '<button class="btn btn-maroon btn-sm" type="submit">Search</button>' +
+        '<button class="btn btn-light btn-sm" type="button" id="recClear">Clear</button>' +
+      '</form>' +
+      '<div class="rec-filters">' + d.filters.map(f =>
+        '<button type="button" class="rec-pill' + (REC.status === f.key ? ' is-on' : '') +
+        '" data-status="' + f.key + '">' + esc(f.label) +
+        ' <span>' + (d.counts[f.key] || 0) + '</span></button>').join('') + '</div>' +
+      '<p class="rec-count">' + (d.total
+        ? 'Showing ' + first + '–' + last + ' of ' + d.total + ' booking' + (d.total === 1 ? '' : 's')
+        : 'Nothing matches that search.') + '</p>' +
+      '<div class="ptable-wrap"><table class="ptable rec-table"><thead><tr>' +
+        th('ref', 'Reference') + th('date', 'Date &amp; time') + th('room', 'Room') +
+        '<th>Purpose</th>' + th('by', 'Asked by') + th('status', 'State') +
+        '</tr></thead><tbody>' +
+        (d.rows.length ? d.rows.map(row).join('')
+          : '<tr><td colspan="6"><small>No booking matches.</small></td></tr>') +
+        '</tbody></table></div>' +
+      (d.pages > 1
+        ? '<div class="rec-pages">' +
+            '<button class="btn btn-light btn-sm" data-page="' + (d.page - 1) + '"' +
+              (d.page <= 1 ? ' disabled' : '') + '>‹ Previous</button>' +
+            '<span>Page ' + d.page + ' of ' + d.pages + '</span>' +
+            '<button class="btn btn-light btn-sm" data-page="' + (d.page + 1) + '"' +
+              (d.page >= d.pages ? ' disabled' : '') + '>Next ›</button>' +
+          '</div>'
+        : '');
+
+    const reload = () => { viewRecords(); };
+    $('#recForm').addEventListener('submit', e => {
+      e.preventDefault();
+      REC.q = $('#recQ').value.trim();
+      REC.room = $('#recRoom').value;
+      REC.from = $('#recFrom').value;
+      REC.to = $('#recTo').value;
+      REC.page = 1; REC.open = 0;
+      reload();
+    });
+    $('#recClear').addEventListener('click', () => {
+      REC.q = ''; REC.room = ''; REC.from = ''; REC.to = '';
+      REC.status = 'all'; REC.page = 1; REC.open = 0;
+      reload();
+    });
+    $$('[data-status]').forEach(b => b.addEventListener('click', () => {
+      REC.status = b.dataset.status; REC.page = 1; REC.open = 0; reload();
+    }));
+    $$('[data-sort]').forEach(b => b.addEventListener('click', () => {
+      if (REC.sort === b.dataset.sort) REC.dir = (REC.dir === 'asc' ? 'desc' : 'asc');
+      else { REC.sort = b.dataset.sort; REC.dir = 'desc'; }
+      REC.page = 1; reload();
+    }));
+    $$('[data-page]').forEach(b => b.addEventListener('click', () => {
+      REC.page = Number(b.dataset.page); REC.open = 0; reload();
+    }));
+    $$('[data-open]').forEach(tr => tr.addEventListener('click', () => {
+      const id = Number(tr.dataset.open);
+      REC.open = (REC.open === id ? 0 : id);
+      reload();
+    }));
+
+    if (REC.open){
+      try {
+        const b = await api('GET', '/bookings/records/' + REC.open);
+        const box = $('#recDetail');
+        if (box) box.innerHTML = recordDetail(b);
+      } catch (err){ toast(err.message, true); }
+    }
+  }
+
+  function recordDetail(b){
+    const line = (k, v) => v ? '<li><span>' + k + '</span>' + esc(v) + '</li>' : '';
+    const stamp = t => { const d = new Date(t); return isNaN(d) ? t : d.toLocaleString(); };
+    return '<div class="rec-detail-grid">' +
+      '<div><h4>The request</h4><ul class="rec-facts">' +
+        line('Reference', b.ref) +
+        line('Room', b.room + (b.room_location ? ' · ' + b.room_location : '')) +
+        line('When', dayText(b.date) + ', ' + b.start + '–' + b.end) +
+        line('Purpose', b.title) +
+        line('Details', b.purpose) +
+        line('People', b.attendees ? String(b.attendees) : '') +
+        line('Needs', b.needs) +
+        (b.outside ? '<li><span>Outside</span>an outside organisation is involved</li>' : '') +
+      '</ul></div>' +
+      '<div><h4>Who asked</h4><ul class="rec-facts">' +
+        line('Name', b.by) + line('E-mail', b.email) + line('Roll no.', b.roll) +
+        line('Phone', b.phone) + line('Advisor', b.supervisor) +
+        line('Came from', b.source === 'public' ? 'the booking form on the website' : 'the portal') +
+      '</ul></div>' +
+      '<div><h4>What happened</h4><ul class="rec-facts">' +
+        line('Made', stamp(b.made)) +
+        line('Forwarded', b.forwarded_at ? stamp(b.forwarded_at) + (b.forwarded_by ? ' by ' + b.forwarded_by : '') : '') +
+        line('Decided', b.decided_at ? stamp(b.decided_at) + (b.decided_by ? ' by ' + b.decided_by : '') : '') +
+        line('Confirmed', b.confirmed_at ? stamp(b.confirmed_at) + (b.confirmed_by ? ' by ' + b.confirmed_by : '') : '') +
+        line('Note', b.note) +
+        line('State', b.status_label) +
+      '</ul></div></div>' +
+      (b.history && b.history.length
+        ? '<h4 class="rec-h4">Step by step</h4><ol class="rec-log">' + b.history.map(h =>
+            '<li><span class="rec-when">' + esc(stamp(h.at)) + '</span>' +
+            '<span class="rec-what">' + esc(h.action) +
+            (h.note ? ' — ' + esc(h.note) : '') + '</span>' +
+            '<span class="rec-who">' + esc(h.actor || '') + '</span></li>').join('') + '</ol>'
+        : '');
+  }
+
+  /* =====================================================================
      3. Approvals   (the Head of the Department)
      ===================================================================== */
   async function viewApprovals(){
@@ -468,10 +663,12 @@
         (b.advisor ? '<br><small>Advisor: ' + esc(b.advisor) + '</small>' : '') +
         (b.source === 'public' ? '<br><small class="bk-src">from the website</small>' : '') + '</td>' +
       '<td class="actions">' +
-        '<button class="btn btn-maroon btn-sm" data-decide="approve" data-id="' + b.id + '">Approve</button>' +
-        '<button class="btn btn-danger btn-sm" data-decide="reject" data-id="' + b.id + '">Reject</button></td></tr>';
+        (canHod()
+          ? '<button class="btn btn-maroon btn-sm" data-decide="approve" data-id="' + b.id + '">Approve</button>' +
+            '<button class="btn btn-danger btn-sm" data-decide="reject" data-id="' + b.id + '">Reject</button>'
+          : '') + '</td></tr>';
 
-    const dayBtns = (d.days || []).length
+    const dayBtns = (d.days || []).length && canHod()
       ? '<div class="bk-days"><span>Clear a whole day:</span>' + d.days.map(x =>
           '<button class="btn btn-light btn-sm" data-day-approve="' + esc(x.date) + '">' +
           esc(x.pretty) + ' (' + x.count + ')</button>').join('') + '</div>'
@@ -485,14 +682,15 @@
           ? 'The office has asked for bookings to go out the moment you approve them.'
           : 'Your approval does not send anything on its own: the office confirms it afterwards, ' +
             'and that is what tells the person who asked. The list below shows what is still with them.')) +
-      dayBtns +
+      watchNote('Head of the Department’s own account') + dayBtns +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th><input type="checkbox" id="bkAll" aria-label="Select all"></th>' +
         '<th>Date &amp; time</th><th>Room</th><th>Purpose</th><th>Asked by</th><th></th></tr></thead><tbody>' +
         (d.waiting.length ? d.waiting.map(row).join('')
           : '<tr><td colspan="6"><small>Nothing is waiting for you.</small></td></tr>') +
         '</tbody></table></div>' +
-      (d.waiting.length ? '<div class="view-actions"><button class="btn btn-maroon" id="bkMany">Approve selected</button>' +
-        '<button class="btn btn-light" id="bkManyNo">Reject selected</button></div>' : '') +
+      (d.waiting.length && canHod()
+        ? '<div class="view-actions"><button class="btn btn-maroon" id="bkMany">Approve selected</button>' +
+          '<button class="btn btn-light" id="bkManyNo">Reject selected</button></div>' : '') +
 
       '<h3 class="bk-h3">Approved by you — waiting for the office to confirm</h3>' +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th>' +
@@ -518,17 +716,25 @@
             '<input type="date" name="auto_until" value="' + esc(d.auto_until || '') + '" min="' + esc(d.today) + '"></label>' +
         '</div><div class="view-actions"><button class="btn btn-maroon" type="submit">Save</button></div></form></div>' +
 
-      '<h3 class="bk-h3">Recently decided</h3>' +
+      '<h3 class="bk-h3">The last few you decided ' +
+        '<a class="bk-more" href="#bkrecords">All booking records \u2192</a></h3>' +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th><th>Purpose</th>' +
         '<th>Asked by</th><th>Outcome</th><th></th></tr></thead><tbody>' +
-        (d.recent.length ? d.recent.map(b => '<tr><td>' + when(b) + '</td><td>' + esc(b.room) + '</td><td>' + esc(b.title) + '</td>' +
+        (d.recent.length ? d.recent.slice(0, 5).map(b => '<tr><td>' + when(b) + '<br><small>' + esc(b.ref) + '</small></td>' +
+          '<td>' + esc(b.room) + '</td><td>' + esc(b.title) + '</td>' +
           '<td>' + esc(b.by) + '</td><td>' + chip(b) + '</td>' +
           '<td class="actions">' + (b.status === 'approved' ?
-            (b.on_board ? '<small>on the Notice Board</small>'
-                        : '<button class="btn btn-light btn-sm" data-notice="' + b.id + '">Put on Notice Board</button>') +
+            (b.confirmed
+              ? (b.on_board ? '<small>on the Notice Board</small>'
+                            : (canHod() || canOffice()
+                                ? '<button class="btn btn-light btn-sm" data-notice="' + b.id + '">Put on Notice Board</button>'
+                                : ''))
+              : '<small class="bk-withhod">the office has still to confirm it</small>') +
             '<button class="btn btn-danger btn-sm" data-revoke="' + b.id + '">Withdraw</button>' : '') + '</td></tr>').join('')
           : '<tr><td colspan="6"><small>Nothing decided yet.</small></td></tr>') +
-        '</tbody></table></div>';
+        '</tbody></table></div>' +
+      '<p class="hint">Only the five most recent are shown here. Everything ever booked, ' +
+        'searchable by reference number, is in <a href="#bkrecords">Booking records</a>.</p>';
 
     const picked = () => $$('.bk-pick').filter(x => x.checked).map(x => Number(x.value));
     const all = $('#bkAll');
@@ -670,6 +876,7 @@
       VIEWS.bkqueue = viewQueue;
       VIEWS.bktoday = viewToday;
       VIEWS.bkapprovals = viewApprovals;
+      VIEWS.bkrecords = viewRecords;
       VIEWS.bkrooms = viewRooms;
     },
     nav: function(items, me){
@@ -678,6 +885,7 @@
       if (me.role === 'office' || me.role === 'admin') items.push(['bkqueue', '📋', 'Booking requests']);
       if (me.role === 'office' || me.role === 'hod' || me.role === 'admin') items.push(['bktoday', '📅', 'Today']);
       if (me.role === 'hod' || me.role === 'admin') items.push(['bkapprovals', '✅', 'Approvals']);
+      if (me.role === 'office' || me.role === 'hod' || me.role === 'admin') items.push(['bkrecords', '🗃', 'Booking records']);
       if (me.role === 'admin') items.push(['bkrooms', '🗝', 'Rooms & halls']);
     }
   });

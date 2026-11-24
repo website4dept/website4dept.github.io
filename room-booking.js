@@ -1,28 +1,3 @@
-/* ---------------------------------------------------------------------------
-   The Institute logo.  Pages ask for assets/iitkgp-logo.png first; until that
-   file is put there (see assets/README.md) we fall back to the copy on the
-   Institute's NPTEL server.  This is done here rather than with an onerror=""
-   attribute in the page, because the site runs under a Content-Security-Policy
-   that forbids script written inside the page.
-   --------------------------------------------------------------------------- */
-(function(){
-  var FALLBACK = "https://nptel.iitkgp.ac.in/images/logo.png";
-  function fix(){
-    var imgs = document.querySelectorAll('img[src$="assets/iitkgp-logo.png"]');
-    for (var i = 0; i < imgs.length; i++){
-      (function(img){
-        img.addEventListener("error", function once(){
-          img.removeEventListener("error", once);
-          img.src = FALLBACK;
-        });
-        if (img.complete && img.naturalWidth === 0) img.src = FALLBACK;
-      })(imgs[i]);
-    }
-  }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fix);
-  else fix();
-})();
-
 /* =====================================================================
    Book a seminar hall or classroom — the public form
    =====================================================================

@@ -400,25 +400,62 @@ def missing_addresses():
 # ---------------------------------------------------------------------------
 # 3. Who may do what
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Who may do what
+#
+# Deciding a booking is an authority decision, not a technical one.  The admin
+# account keeps the system running - rooms, accounts, blackout dates, settings,
+# System health - and can READ every booking screen, but it cannot forward,
+# return, refuse, approve or confirm anything.  Those need the real office or
+# HoD account, which is what keeps two different people on every booking.
+#
+# The one thing the admin may still do is withdraw a confirmed booking.  That is
+# damage control - a clash, an institute event, a mistake - it frees the room
+# rather than claiming it, and everyone involved is e-mailed, so it cannot be
+# done quietly.
+# ---------------------------------------------------------------------------
+ADMIN_ONLY_WATCHES = ("You are signed in as the admin, which can see every booking but not decide one. "
+                      "Sign in as the department office, or ask the Head of the Department.")
+
+
 def may_office(u):
-    return u["role"] in ("office", "admin")
+    """May ACT as the department office."""
+    return u["role"] == "office"
 
 
 def may_hod(u):
-    return u["role"] in ("hod", "admin")
+    """May ACT as the Head of the Department."""
+    return u["role"] == "hod"
+
+
+def may_watch(u):
+    """May SEE the office and HoD screens, and the booking records."""
+    return u["role"] in ("office", "hod", "admin")
+
+
+def no_entry(u, who):
+    return S.ApiError(403, ADMIN_ONLY_WATCHES if u["role"] == "admin" else who)
 
 
 def require_office(req):
     u = S.require_ready_user(req)
     if not may_office(u):
-        raise S.ApiError(403, "This section is for the department office.")
+        raise no_entry(u, "This section is for the department office.")
     return u
 
 
 def require_hod(req):
     u = S.require_ready_user(req)
     if not may_hod(u):
-        raise S.ApiError(403, "This section is for the Head of the Department.")
+        raise no_entry(u, "This section is for the Head of the Department.")
+    return u
+
+
+def require_watch(req):
+    """For the screens that only show things."""
+    u = S.require_ready_user(req)
+    if not may_watch(u):
+        raise S.ApiError(403, "This section is for the department office and the Head.")
     return u
 
 
@@ -717,6 +754,7 @@ def api_config(req):
     c = cfg()
     rooms = [room_public(r) for r in S.q("SELECT * FROM rooms WHERE active=1 ORDER BY sort, name").fetchall()]
     return {"rooms": rooms, "can_request": may_request(u), "office": may_office(u), "hod": may_hod(u),
+            "watch_only": may_watch(u) and not (may_office(u) or may_hod(u)),
             "admin": u["role"] == "admin", "today": today_local(),
             "day_start": c["day_start"], "day_end": c["day_end"], "max_days_ahead": c["max_days_ahead"],
             "max_hours": c["max_hours"], "buffer_min": c["buffer_min"], "blackout": c["blackout"],
@@ -872,7 +910,7 @@ def api_cancel(req, bid):
     b = booking_row(int(bid))
     mine = b["user_id"] == u["id"]
     if not (mine or may_office(u) or may_hod(u)):
-        raise S.ApiError(403, "This is not your booking.")
+        raise no_entry(u, "This is not your booking.")
     if b["status"] in ("cancelled", "rejected"):
         raise S.ApiError(400, "That request is already closed.")
     note = text((req.json() or {}).get("note"), 500, "The reason")
@@ -976,7 +1014,7 @@ def blockers(b, room):
 
 def api_office_check(req, bid):
     """The checklist the office sees before forwarding or confirming."""
-    require_office(req)
+    require_watch(req)
     b = booking_row(int(bid))
     room = room_row(b["room_id"])
     checks = office_checks(b, room)
@@ -990,7 +1028,7 @@ def api_office_check(req, bid):
 
 
 def api_queue(req):
-    require_office(req)
+    require_watch(req)
     rows = S.q("SELECT * FROM bookings WHERE status IN ('pending','returned','forwarded')"
                " ORDER BY on_date, t_start").fetchall()
     out = []
@@ -1173,7 +1211,7 @@ def confirm_booking(req, b, u, note=""):
 
 
 def api_hod(req):
-    require_hod(req)
+    require_watch(req)
     c = cfg()
     waiting = S.q("SELECT * FROM bookings WHERE status='forwarded' ORDER BY on_date, t_start").fetchall()
     recent = S.q("SELECT * FROM bookings WHERE status IN ('approved','rejected') ORDER BY id DESC LIMIT 40").fetchall()
@@ -1261,7 +1299,9 @@ def api_decide_many(req):
 def api_revoke(req, bid):
     """Take back a booking that was already confirmed (institute event, clash, mistake)."""
     u = S.require_ready_user(req)
-    if not (may_hod(u) or may_office(u)):
+    # The admin may do this one: it frees a room rather than claiming one, and
+    # everybody involved is e-mailed about it.
+    if not may_watch(u):
         raise S.ApiError(403, "Only the office or the Head can take back a confirmed booking.")
     b = booking_row(int(bid))
     if b["status"] != "approved":
@@ -1556,7 +1596,7 @@ def api_no_show(req, bid):
     """The office records that a confirmed booking went unused."""
     u = S.require_ready_user(req)
     if not (may_office(u) or may_hod(u)):
-        raise S.ApiError(403, "Only the department office can mark a booking as unused.")
+        raise no_entry(u, "Only the department office can mark a booking as unused.")
     b = booking_row(int(bid))
     if b["status"] != "approved":
         raise S.ApiError(400, "Only a confirmed booking can be marked as unused.")
@@ -1584,7 +1624,7 @@ def no_show_count(email):
 def api_publish_notice(req, bid):
     u = S.require_ready_user(req)
     if not (may_office(u) or may_hod(u)):
-        raise S.ApiError(403, "Only the department office or the Head can publish a notice.")
+        raise no_entry(u, "Only the department office or the Head can publish a notice.")
     b = booking_row(int(bid))
     if b["status"] != "approved" or not b["confirmed"]:
         raise S.ApiError(400, "Only a booking the office has confirmed can be published.")
@@ -1615,11 +1655,141 @@ def api_publish_notice(req, bid):
 
 
 # ---------------------------------------------------------------------------
+# 11d2. The record of every booking - search, filter, sort
+#
+# The office and the Head both need to answer questions like "what happened to
+# MA-B-2026-0042?" or "how many times has that hall been used this term?" long
+# after a booking has left their to-do list.  This is the one place that
+# answers them: every booking, whatever its state, searchable by reference
+# number, name, e-mail, roll number, phone, title or room.
+# ---------------------------------------------------------------------------
+PER_PAGE = 25
+
+# label -> the condition that selects it. Order matters: it is the order of the
+# filter buttons on the screen.
+RECORD_FILTERS = [
+    ("all",       "Everything",              ""),
+    ("confirmed", "Confirmed",               "status='approved' AND confirmed=1"),
+    ("awaiting",  "Waiting for the office",  "status='approved' AND confirmed=0"),
+    ("hod",       "With the Head",           "status='forwarded'"),
+    ("office",    "With the office",         "status IN ('pending','returned')"),
+    ("rejected",  "Refused",                 "status='rejected'"),
+    ("cancelled", "Cancelled",               "status='cancelled'"),
+]
+
+# label -> the ORDER BY it maps to. Never build this from user input directly.
+RECORD_SORTS = {
+    "date":   "on_date {d}, t_start {d}",
+    "ref":    "ref {d}",
+    "room":   "(SELECT name FROM rooms WHERE rooms.id=bookings.room_id) {d}, on_date DESC",
+    "by":     "lower(requester_name) {d}, on_date DESC",
+    "status": "status {d}, confirmed {d}, on_date DESC",
+    "made":   "id {d}",
+}
+
+
+def record_query(req):
+    """Turns the query string into (where, args) - used by the list and the counts."""
+    where, args = [], []
+    term = str(req.query.get("q") or "").strip()
+    if term:
+        like = "%" + term.lower() + "%"
+        where.append("(lower(ref) LIKE ? OR lower(requester_name) LIKE ? OR lower(requester_email) LIKE ?"
+                     " OR lower(roll) LIKE ? OR lower(phone) LIKE ? OR lower(title) LIKE ?"
+                     " OR lower(advisor_name) LIKE ?"
+                     " OR room_id IN (SELECT id FROM rooms WHERE lower(name) LIKE ?))")
+        args += [like] * 8
+    room = str(req.query.get("room") or "").strip()
+    if room.isdigit():
+        where.append("room_id=?")
+        args.append(int(room))
+    for key, col in (("from", ">="), ("to", "<=")):
+        v = str(req.query.get(key) or "").strip()
+        if v:
+            where.append("on_date " + col + " ?")
+            args.append(ymd(v))
+    return where, args, term
+
+
+def api_records(req):
+    u = S.require_ready_user(req)
+    if not may_watch(u):
+        raise S.ApiError(403, "The booking records are for the department office and the Head.")
+
+    where, args, term = record_query(req)
+
+    # how many there are in each state, for the filter buttons - worked out
+    # before the state filter is applied, so the numbers do not all become 0
+    counts = {}
+    for key, _label, cond in RECORD_FILTERS:
+        w = list(where) + ([cond] if cond else [])
+        sql = "SELECT COUNT(*) c FROM bookings" + (" WHERE " + " AND ".join(w) if w else "")
+        counts[key] = S.q1(sql, tuple(args))["c"]
+
+    state = str(req.query.get("status") or "all")
+    cond = dict((k, c) for k, _l, c in RECORD_FILTERS).get(state, "")
+    if cond:
+        where.append(cond)
+
+    sort = str(req.query.get("sort") or "date")
+    if sort not in RECORD_SORTS:
+        sort = "date"
+    direction = "ASC" if str(req.query.get("dir") or "desc").lower() == "asc" else "DESC"
+    order = RECORD_SORTS[sort].format(d=direction)
+
+    clause = (" WHERE " + " AND ".join(where)) if where else ""
+    total = S.q1("SELECT COUNT(*) c FROM bookings" + clause, tuple(args))["c"]
+    pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    try:
+        page = max(1, min(pages, int(req.query.get("page") or 1)))
+    except ValueError:
+        page = 1
+
+    rows = S.q("SELECT * FROM bookings" + clause + " ORDER BY " + order + " LIMIT ? OFFSET ?",
+               tuple(args) + (PER_PAGE, (page - 1) * PER_PAGE)).fetchall()
+    out = []
+    for b in rows:
+        item = booking_public(b, who=True)
+        item["made"] = b["created"]
+        item["decided"] = b["decided_at"] or ""
+        item["confirmed_at"] = b["confirmed_at"] or ""
+        out.append(item)
+    return {"rows": out, "total": total, "page": page, "pages": pages, "per_page": PER_PAGE,
+            "term": term, "status": state, "sort": sort, "dir": direction.lower(),
+            "counts": counts,
+            "filters": [{"key": k, "label": l} for k, l, _c in RECORD_FILTERS],
+            "rooms": [room_public(r) for r in S.q("SELECT * FROM rooms ORDER BY sort, name").fetchall()]}
+
+
+def api_record(req, bid):
+    """One booking with everything that ever happened to it."""
+    u = S.require_ready_user(req)
+    if not may_watch(u):
+        raise S.ApiError(403, "The booking records are for the department office and the Head.")
+    b = booking_row(int(bid))
+    room = room_row(b["room_id"])
+    item = booking_public(b, who=True)
+    item["room_location"] = room["location"]
+    item["needs_hod"] = bool(room["needs_hod"])
+    item["made"] = b["created"]
+    item["forwarded_at"] = b["forwarded_at"] or ""
+    item["decided_at"] = b["decided_at"] or ""
+    item["confirmed_at"] = b["confirmed_at"] or ""
+    item["forwarded_by"] = user_label(b["forwarded_by"]) if b["forwarded_by"] else ""
+    item["decided_by"] = user_label(b["decided_by"]) if b["decided_by"] else ""
+    item["confirmed_by"] = user_label(b["confirmed_by"]) if b["confirmed_by"] else ""
+    item["history"] = [{"at": r["at"], "actor": r["actor"], "action": r["action"], "note": r["note"]}
+                       for r in S.q("SELECT * FROM booking_log WHERE booking_id=? ORDER BY id",
+                                    (b["id"],)).fetchall()]
+    return item
+
+
+# ---------------------------------------------------------------------------
 # 11e. Today's bookings, for the office to print and pin up
 # ---------------------------------------------------------------------------
 def api_today(req):
     u = S.require_ready_user(req)
-    if not (may_office(u) or may_hod(u) or u["role"] == "admin"):
+    if not may_watch(u):
         raise S.ApiError(403, "This sheet is for the department office.")
     day = ymd(req.query.get("date") or today_local())
     rooms = [room_public(r) for r in S.q("SELECT * FROM rooms WHERE active=1 ORDER BY sort, name").fetchall()]
@@ -1704,10 +1874,15 @@ def api_settings(req):
     waits in "Ready to confirm".
     """
     u = S.require_ready_user(req)
+    # Settings are configuration, so the admin may change them - except the
+    # Head's standing approval, which decides which bookings skip him and is
+    # therefore his to give, not the system keeper's.
     boss = may_hod(u) or u["role"] == "admin"
     if not (boss or may_office(u)):
         raise S.ApiError(403, "Only the department office, the Head or an admin can change these.")
     d = req.json()
+    if ("auto_rooms" in d or "auto_until" in d) and not may_hod(u):
+        raise S.ApiError(403, "Standing approval is the Head's to give. Only his account can change it.")
     changes = {}
     if "office_auto_confirm" in d:
         changes["office_auto_confirm"] = bool(d.get("office_auto_confirm"))
@@ -1794,6 +1969,8 @@ ROUTE_TABLE = [
     ("GET",    r"/api/bookings/availability",  api_availability),
     ("GET",    r"/api/bookings/mine",          api_mine),
     ("GET",    r"/api/bookings/queue",         api_queue),
+    ("GET",    r"/api/bookings/records",       api_records),
+    ("GET",    r"/api/bookings/records/(\d+)", api_record),
     ("GET",    r"/api/bookings/(\d+)/check",    api_office_check),
     ("GET",    r"/api/bookings/hod",           api_hod),
     ("GET",    r"/api/bookings/today",         api_today),

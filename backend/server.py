@@ -731,16 +731,16 @@ STATUS_TEXT = {200: "200 OK", 201: "201 Created", 204: "204 No Content", 400: "4
 # a far smaller risk than inline script.  SECURITY.md lists them if you ever
 # want to move them into portal.css and tighten this line.
 #
-# The three outside addresses are: Google Fonts (the two font servers), and the
-# Institute's NPTEL server, which is only needed until the logo is saved at
-# assets/iitkgp-logo.png - see assets/README.md.
+# The only outside addresses left are the two Google Fonts servers.  Images,
+# scripts and everything else must come from this site: the Institute logo is
+# served from assets/iitkgp-logo.png rather than from another server.
 # ---------------------------------------------------------------------------
 CSP = "; ".join([
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https://nptel.iitkgp.ac.in",
+    "img-src 'self' data:",
     "media-src 'self'",
     "connect-src 'self'",
     "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",

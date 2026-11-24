@@ -93,23 +93,32 @@ def main():
     hall = server.q1("SELECT * FROM rooms WHERE name='Seminar Hall'")
     def day(n):
         return (server.now() + server.timedelta(days=n)).strftime("%Y-%m-%d")
-    samples = [(3, "08:00", "20:00", "Departmental workshop (all day)"),
-               (5, "10:00", "12:00", "Invited seminar: post-quantum signatures"),
-               (5, "15:00", "17:00", "Research scholars' colloquium"),
-               (8, "14:00", "16:00", "Faculty meeting")]
+    # One booking in each state, so every screen has something on it and you can
+    # see the whole flow without having to create it all by hand:
+    #   confirmed  - settled; shows on the public calendar and on Today's sheet
+    #   approved   - the Head has said yes, waiting in the office's "Ready to confirm"
+    #   forwarded  - sitting with the Head, on his Approvals page
+    #   pending    - just arrived, on the office's desk
+    samples = [(3, "08:00", "20:00", "Departmental workshop (all day)",      "confirmed"),
+               (5, "10:00", "12:00", "Invited seminar: post-quantum signatures", "confirmed"),
+               (5, "15:00", "17:00", "Research scholars' colloquium",        "approved"),
+               (8, "14:00", "16:00", "Faculty meeting",                      "forwarded"),
+               (9, "11:00", "13:00", "Departmental colloquium",              "pending")]
     at = server.iso(server.now())
     # These sample bookings are attributed to a separate demo address on purpose.
     # If they used your address they would count against the "requests per hour"
     # limit, and your own first booking would be refused.
     seeded_by = "samples.demo@" + domain
-    for n, a, b, title in samples:
+    for n, a, b, title, state in samples:
+        status = "approved" if state in ("confirmed", "approved") else state
+        confirmed = 1 if state == "confirmed" else 0
         cur = server.q(
             "INSERT INTO bookings(ref,room_id,user_id,person_id,on_date,t_start,t_end,title,purpose,"
-            "attendees,needs,outside,hide_name,status,created,updated,requester_name,requester_email,"
-            "roll,phone,advisor_id,advisor_name,advisor_email,source)"
-            " VALUES('',?,0,?,?,?,?,?,'',40,'',0,0,'approved',?,?,?,?,'','3222283654',?,?,?,'public')",
-            (hall["id"], FACULTY_ID, day(n), a, b, title, at, at, "Ratna Dutta", seeded_by,
-             FACULTY_ID, "Ratna Dutta", me))
+            "attendees,needs,outside,hide_name,status,confirmed,created,updated,requester_name,"
+            "requester_email,roll,phone,advisor_id,advisor_name,advisor_email,source)"
+            " VALUES('',?,0,?,?,?,?,?,'',40,'',0,0,?,?,?,?,?,?,'','3222283654',?,?,?,'public')",
+            (hall["id"], FACULTY_ID, day(n), a, b, title, status, confirmed, at, at,
+             "Ratna Dutta", seeded_by, FACULTY_ID, "Ratna Dutta", me))
         server.q("UPDATE bookings SET ref=? WHERE id=?",
                  ("MA-B-{}-{:04d}".format(day(n)[:4], cur.lastrowid), cur.lastrowid))
 

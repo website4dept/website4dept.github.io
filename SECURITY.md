@@ -56,7 +56,7 @@ and the same list in `deploy/nginx-site.conf` and `deploy/apache-site.conf`):
 
 | Header | What it does |
 |---|---|
-| `Content-Security-Policy` | the browser refuses to run any script that is not one of our own files |
+| `Content-Security-Policy` | the browser refuses to run any script, or load any image, that is not one of our own files |
 | `X-Content-Type-Options: nosniff` | the browser does not guess file types |
 | `Referrer-Policy: same-origin` | other sites are not told which page a visitor came from |
 | `X-Frame-Options` / `frame-ancestors` | the site cannot be hidden inside somebody else's page |
@@ -148,10 +148,9 @@ These are open on purpose. They are written down so nobody finds them by
 surprise.
 
 * **`style-src` allows inline styles.** See section 3.
-* **Three outside addresses are allowed:** Google Fonts (two servers) and the
-  Institute's NPTEL server, the last only until the logo is saved at
-  `assets/iitkgp-logo.png` — see `assets/README.md`. Removing Google Fonts
-  would mean hosting the two font families yourself.
+* **Two outside addresses are allowed:** the two Google Fonts servers, and
+  nothing else — no outside images, scripts or connections of any kind. Removing
+  Google Fonts too would mean hosting the two font families yourself.
 * **Rate limiting is in memory**, so it resets when the service restarts and is
   counted per process. Enough for ordinary abuse; not a defence against a
   determined flood. If that ever matters, ask CIC to put rate limiting in nginx.

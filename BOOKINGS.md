@@ -158,12 +158,37 @@ of requests per address per hour are capped.
 |---|---|---|
 | anyone on the register, not signed in | the website form | Ask for a room (with a code), and read the e-mails |
 | `member` (faculty, scholars, postdocs, staff) | Book a room | Ask for a room, follow their own requests, cancel them |
-| `office` | Book a room, Booking requests | Every request lands here. Forward a hall to the Head, confirm a classroom, return or reject anything, withdraw a confirmed booking. One shared account: two people signed in at a time, a third signs the oldest out |
-| `hod` | Book a room, Approvals | Approve or reject what the office has forwarded, in bulk if they like; set standing approval; withdraw a booking |
-| `admin` | all of the above, plus Rooms & halls | Everything, and add or edit rooms |
+| `office` | Book a room, Booking requests, Today, Booking records | Every request lands here. Forward a hall to the Head, confirm a classroom, confirm what the Head has approved, return or reject anything, withdraw a confirmed booking, mark a no-show. One shared account: two people signed in at a time, a third signs the oldest out |
+| `hod` | Book a room, Approvals, Today, Booking records | Approve or reject what the office has forwarded, in bulk or a whole date at once; give standing approval; withdraw a booking |
+| `admin` | all of the above, plus Rooms & halls, Accounts, System health | **Sees every booking screen; decides none of them.** Rooms, accounts, blackout dates, settings, System health — and withdrawing a confirmed booking |
 
 A faculty member who is also the Head gets the `hod` role — they keep their own
 profile editing, because that does not depend on the role.
+
+### Why the admin cannot decide a booking
+
+Deciding a booking is an authority decision, not a technical one. The point of
+splitting approval from confirmation is that **two different people touch each
+booking**; one account able to do both steps would remove that in a single
+click. So `may_office()` and `may_hod()` in `bookings.py` mean *may act as*, and
+no longer include `admin`; a separate `may_watch()` covers the screens that only
+show things.
+
+What the admin gets instead:
+
+* every booking screen, read-only — the queue, Approvals, Today, the records,
+  and the pre-forward checklist (as **See the checklist**, with nothing to press)
+* a note at the top of each page saying so
+* **Withdraw**, which is kept on purpose: it frees a room rather than claiming
+  one, and everybody involved is e-mailed, so it cannot be done quietly
+* the settings, because those are configuration — **except** standing approval
+  (`auto_rooms`, `auto_until`), which decides which bookings skip the Head and
+  is therefore his to give
+
+If the admin really must act on a booking, the answer is to sign in as the
+office, or give that person the `office` role — which is itself recorded in the
+activity log. The browser hides the buttons and the server refuses the request,
+so a page left open from yesterday cannot get round it.
 
 ---
 
@@ -321,6 +346,37 @@ cancel bookings nobody meant to cancel. The token is single-use and stored hashe
 **The office can mark a booking as not used**, from the queue or from the Today
 sheet. The count per person shows beside their name on the office screen — plain
 information, not a penalty.
+
+## 8b2. The booking records
+
+Portal -> **Booking records** (office, Head and admin). Every booking ever made,
+whatever became of it.
+
+* **Search** covers the reference number, the name, the e-mail address, the roll
+  number, the phone number, the purpose and the room name - one box, no need to
+  pick which field.
+* **Filter** by state, with a live count on each button: everything, confirmed,
+  waiting for the office, with the Head, with the office, refused, cancelled.
+  Also by room and by date range.
+* **Sort** by clicking any column heading - reference, date, room, who asked,
+  state - and click again to reverse it.
+* **Click a row** and it opens out: the request, who asked, what happened and
+  when, and a step-by-step list of every action with the person who took it,
+  read straight from `booking_log`.
+* 25 to a page.
+
+`#bkrecords/42` opens one record directly, so a reference number can be passed
+around as a link.
+
+The Head's Approvals page used to carry a long "Recently decided" table. It now
+shows only the last five, with a link here, because the question "what happened
+to MA-B-2026-0042?" is asked months later and belongs in a record you can
+search, not in a list that scrolls off the bottom of a to-do page.
+
+In the code: `api_records()` and `api_record()` in `bookings.py`,
+`viewRecords()` in `portal/bookings.js`. The sort order is chosen from a fixed
+table (`RECORD_SORTS`), never built from what the browser sends, so no query can
+be smuggled in through the sort parameter.
 
 ## 8c. Today's sheet
 

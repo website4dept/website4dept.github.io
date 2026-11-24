@@ -32,21 +32,19 @@ server if you are running that).
 
 ### The IIT Kharagpur logo in the top-left corner
 
-Every page looks for the logo at **`assets/iitkgp-logo.png`** first. That file is
-not in the folder yet, so until you add it the pages quietly fall back to the copy
-on the Institute's NPTEL server — which is how the site worked before, but it is
-slower and it depends on somebody else's server staying up.
+It is already in place, in `assets/`:
 
-To fix that for good:
+| File | What it is |
+|---|---|
+| `assets/iitkgp-logo.png` | what every page actually shows (204 × 229, transparent, 8 KB) |
+| `assets/iitkgp-logo.svg` | the vector original — use this one for posters, slides or anything printed |
 
-1. Save the official logo as a PNG, about 200 × 200 pixels, transparent background.
-2. Name it exactly `iitkgp-logo.png`.
-3. Put it in the `assets/` folder.
-4. Nothing else to change. Every page picks it up straight away.
+To replace it, overwrite `assets/iitkgp-logo.png` keeping that exact name, then
+raise the `?v=` number (see "Making a change show up" below). Nothing else to edit.
 
-(Then, if you like: in `backend/server.py` find `CSP` and delete
-`https://nptel.iitkgp.ac.in` from the `img-src` line. The site stops talking to
-any outside server for images at all.)
+The site no longer fetches the logo from another server, and its security policy
+now refuses images from outside addresses altogether. If you ever need to show a
+picture hosted elsewhere, see `assets/README.md`.
 
 ### A photo for a person
 
@@ -190,6 +188,35 @@ Three places tell you where something is stuck:
   office to confirm*.
 * Portal → **System health** (admin) — warns if anything has sat unconfirmed for
   more than two days.
+
+### What the admin account can and cannot do
+
+The admin keeps the system running — rooms, accounts, blackout dates, settings,
+System health — and can **look at every booking screen**. It cannot forward,
+return, refuse, approve or confirm a booking. Those need the office or the
+Head's own account, which is what keeps two different people on every booking.
+
+The one thing the admin can still do to a booking is **Withdraw**, for when a
+room has to be freed in a hurry. That e-mails everybody involved, so it is never
+quiet.
+
+If somebody in the office also needs to be able to act, give them the `office`
+role in Portal → Accounts rather than the admin one.
+
+### Looking up an old booking
+
+Portal -> **Booking records**. Type a reference number - or a name, an e-mail
+address, a roll number, a phone number, the purpose, or the room - and it comes
+up. Narrow it with the state buttons along the top (confirmed, waiting for the
+office, refused, cancelled...), by room, or by date range. Click any column
+heading to sort by it; click again to reverse.
+
+Click the row itself and it opens out to show everything that ever happened to
+that booking: who asked, who forwarded it, who approved it, who confirmed it,
+and the note each of them left.
+
+This is where to look months later. The Head's Approvals page only keeps the
+last five decisions, on purpose.
 
 ### Before forwarding: the checklist
 

@@ -4,6 +4,130 @@ Newest first. Each entry says what was asked for, which files changed, and why.
 
 ---
 
+## 24 November 2026 (evening) — The admin can watch, but not decide
+
+You noticed the admin account could reject a booking and asked whether it should
+be able to. It should not, and now it cannot.
+
+### The reasoning
+
+Deciding a booking is an authority decision, not a technical one. The whole
+point of splitting approval from confirmation is that **two different people
+touch each booking** — one account able to do both steps removes that control in
+a single click. The person who can reset passwords and edit room records is not
+the person the department has asked to decide who gets the seminar hall.
+
+### What changed
+
+`may_office()` and `may_hod()` used to return true for `admin` as well. They now
+mean *may act as* and cover only the real role; a new `may_watch()` covers the
+screens that only show things.
+
+| The admin can | The admin cannot |
+|---|---|
+| see the office queue, Approvals, Today and the booking records | forward, return, refuse, approve, confirm |
+| open the pre-forward checklist, as **See the checklist** (nothing to press) | clear a whole date, or approve several at once |
+| **withdraw** a confirmed booking | mark a no-show, or put a booking on the Notice Board |
+| change the booking rules — hours, how far ahead, blackout dates | give the Head's **standing approval** (`auto_rooms`, `auto_until`) |
+| rooms, accounts, System health, everything else as before | |
+
+**Withdraw was kept on purpose.** It frees a room rather than claiming one, and
+everyone involved is e-mailed, so it cannot be done quietly — which is exactly
+what you want available when a clash turns up at short notice.
+
+**Standing approval was taken away** because it decides which bookings skip the
+Head altogether. That is his to give, not the system keeper's.
+
+Each of those pages now carries a note at the top explaining the limit, and the
+buttons are simply not drawn. The server checks again on every request, so a
+page left open from yesterday cannot get round it.
+
+| File | Change |
+|---|---|
+| `backend/bookings.py` | `may_office` / `may_hod` narrowed; new `may_watch()`, `require_watch()`, `no_entry()`; read endpoints moved to `require_watch`; `revoke` widened to the admin; standing approval restricted to the Head; `api_config` returns `watch_only` |
+| `portal/bookings.js` | `canOffice()`, `canHod()`, `watchOnly()`, `watchNote()`; every decision button drawn only for the role that may press it; the checklist gained a read-only form |
+| `portal/portal.css` | `.bk-watch`, the note at the top of a page you may read but not act on |
+| `backend/test_bookings.py` | **161 checks** (was 138) — 23 of them on exactly what the admin may and may not do |
+| `BOOKINGS.md`, `HOW-TO-UPDATE.md` | a roles table that now matches the code, and the reasoning |
+| all 17 HTML files | `?v=35` |
+
+If somebody needs to act on bookings, give them the `office` role in
+Portal → Accounts rather than the admin one. That change is itself recorded in
+the activity log.
+
+---
+
+## 24 November 2026 (later still) — Booking records: search by reference number
+
+You looked at "Recently decided" on the Head's page and said it was not the
+useful thing — what is wanted is a way to see **all** past approvals, sorted,
+and searched by reference number. Agreed, and done.
+
+### The new screen
+
+Portal → **Booking records**, for the office, the Head and the admin. Every
+booking ever made, whatever became of it.
+
+| | |
+|---|---|
+| **Search** | one box covering the reference number, the name, the e-mail address, the roll number, the phone number, the purpose and the room name |
+| **Filter** | by state, each button carrying a live count — everything, confirmed, waiting for the office, with the Head, with the office, refused, cancelled — and by room, and by date range |
+| **Sort** | click any column heading (reference, date, room, who asked, state); click again to reverse |
+| **Open a row** | the whole record: the request, who asked, what happened and when, and a step-by-step list of every action with the person who took it |
+| **Link to one** | `#bkrecords/42` opens that record directly |
+
+### What changed on the Head's page
+
+"Recently decided" is now **the last five only**, with a link to the records.
+The question it was trying to answer — "what happened to MA-B-2026-0042?" — gets
+asked months later, and belongs in something you can search rather than a list
+that scrolls off the bottom of a to-do page.
+
+Two buttons there were also offering something the server would refuse: **Put on
+Notice Board** appeared on bookings the office had not confirmed yet. It is now
+replaced by the words *"the office has still to confirm it"* until it is.
+
+| File | Change |
+|---|---|
+| `backend/bookings.py` | new `api_records()` and `api_record()`, `record_query()`, `RECORD_FILTERS`, `RECORD_SORTS`, `PER_PAGE`; two new routes |
+| `portal/bookings.js` | new `viewRecords()` and `recordDetail()`, registered as `bkrecords` and added to the menu; the Head's recent list trimmed to five; the Notice Board button guarded |
+| `portal/portal.css` | the search bar, filter buttons, sortable headings, the opened-out record and its step-by-step list |
+| `backend/test_bookings.py` | **138 checks** (was 112) — search by every field, each filter, both sort directions, paging past the end, one record in full, and that a made-up sort order is ignored rather than run |
+| `BOOKINGS.md`, `HOW-TO-UPDATE.md` | new sections |
+| all 17 HTML files | `?v=34` |
+
+**On the sort order being safe:** the column to sort by is picked from a fixed
+table in the code, never built from what the browser sends. There is a test that
+sends `sort=nonsense';DROP TABLE bookings;--` and checks that it is quietly
+ignored and the table is still there.
+
+---
+
+## 24 November 2026 (later) — The Institute logo is now our own file
+
+You sent the logo, so it is in place and the last outside image has gone.
+
+| File | Change |
+|---|---|
+| `assets/iitkgp-logo.png` | **new** — the crest at 204 × 229 with a transparent background, 8 KB. This is what every page shows. |
+| `assets/iitkgp-logo.svg` | **new** — the vector original you sent, with a `viewBox` added so it scales, and the empty metadata block stripped. Keep it for posters, slides and anything printed. |
+| `footer.js`, `room-booking.js`, `portal/portal.js` | the "if the logo is missing, fetch it from NPTEL" fallback was deleted. There is nothing to fall back to any more. |
+| `backend/server.py`, `deploy/nginx-site.conf`, `deploy/apache-site.conf` | `img-src` in the security policy went from `'self' data: https://nptel.iitkgp.ac.in` to `'self' data:` — **the site now refuses images from any outside server at all** |
+| `portal/portal.css` | `object-fit: contain` on the portal header logo, so the crest keeps its shape in the 52-pixel box |
+| `assets/README.md`, `HOW-TO-UPDATE.md`, `SECURITY.md` | rewritten to match |
+| all 17 HTML files | `?v=33` |
+
+No HTML changed for the logo itself — the pages were already asking for
+`assets/iitkgp-logo.png`; the file simply exists now.
+
+Also in this batch: `backend/try-it.py` now seeds **one sample booking in each
+state** — two confirmed, one approved and waiting in the office's "Ready to
+confirm", one sitting with the Head, one just arrived on the office desk — so
+every screen has something on it the first time you open it and the whole
+approve-then-confirm flow is visible without creating it all by hand.
+
+---
+
 ## 24 November 2026 — Plain page headings, approve-then-confirm, and a safer server
 
 Three things were asked for: take the maroon strip off every tab except the home
