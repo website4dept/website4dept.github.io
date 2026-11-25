@@ -1591,6 +1591,9 @@ def api_export(req):
         z.writestr("notices-data.js", notices_js())
         z.writestr("gallery-data.js", gallery_js())
         z.writestr("students-data.js", students_js())
+        for _ext in EXTENSIONS:                  # forms-data.js, and anything added later
+            if hasattr(_ext, "forms_js"):
+                z.writestr("forms-data.js", _ext.forms_js())
         if os.path.isdir(UPLOADS):
             for root, _, files in os.walk(UPLOADS):
                 for f in files:
@@ -2502,6 +2505,16 @@ try:
     _bookings.install(sys.modules[__name__])
 except Exception as _e:                       # the rest of the portal must still run
     print("[portal] booking system not loaded:", _e)
+
+# FORMS: the blank department forms people download (CL leave, sick leave, ...).
+# Same arrangement as the booking system above: a module of its own that brings
+# its own table and its own addresses. Delete this block and the forms feature
+# disappears without touching anything else.
+try:
+    import forms as _forms
+    _forms.install(sys.modules[__name__])
+except Exception as _e:                       # the rest of the portal must still run
+    print("[portal] forms not loaded:", _e)
 
 
 # make sure tables exist when imported by a WSGI server (gunicorn / mod_wsgi)

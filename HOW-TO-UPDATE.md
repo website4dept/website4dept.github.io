@@ -189,19 +189,39 @@ Three places tell you where something is stuck:
 * Portal → **System health** (admin) — warns if anything has sat unconfirmed for
   more than two days.
 
+## Department forms (CL leave, sick leave, holiday…)
+
+Portal → **Forms** → **Add a form**: a title, the file (PDF or Word, up to
+10 MB), and optionally a group and one line of explanation. Then
+Administration → **Export for website**, and copy the exported
+`forms-data.js` **and** the `uploads/forms/` folder across.
+
+People download them from the **Forms** link in the header of every page. No
+sign-in needed.
+
+To issue a newer version of a form, press **Edit** and choose the new file: the
+download link stays the same, so anything already printed or e-mailed keeps
+working. **Hide** takes a form off the website without losing it; **Delete**
+removes the file too.
+
+The full guide, including what to check when a form does not appear, is in
+`FORMS.md`.
+
+---
+
 ### What the admin account can and cannot do
 
 The admin keeps the system running — rooms, accounts, blackout dates, settings,
-System health — and can **look at every booking screen**. It cannot forward,
-return, refuse, approve or confirm a booking. Those need the office or the
-Head's own account, which is what keeps two different people on every booking.
+System health — and can read **Booking records**, which is every booking ever
+made in every state. That is the whole of its part in the booking system.
 
-The one thing the admin can still do to a booking is **Withdraw**, for when a
-room has to be freed in a hurry. That e-mails everybody involved, so it is never
-quiet.
+It has no Booking requests screen, no Approvals screen and no Today's sheet,
+and it cannot forward, return, refuse, approve, confirm, withdraw, mark a
+no-show or publish a notice. Those belong to the department office and the Head.
 
-If somebody in the office also needs to be able to act, give them the `office`
-role in Portal → Accounts rather than the admin one.
+If somebody needs to be able to act on bookings, give them the `office` role in
+Portal → Accounts rather than the admin one. That change is recorded in the
+activity log.
 
 ### Looking up an old booking
 

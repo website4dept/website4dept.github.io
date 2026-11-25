@@ -4,6 +4,133 @@ Newest first. Each entry says what was asked for, which files changed, and why.
 
 ---
 
+## 25 November 2026 — Department forms, and three booking fixes
+
+### New: forms people can download
+
+The blank forms the department hands out — CL leave, sick leave, restricted
+holiday, and whatever else the office issues. The office puts them up in the
+portal; anybody downloads them from the website without signing in.
+
+**Where people find them:** a small **Forms** link in the header of every page,
+beside Room Booking — the same treatment you chose for the booking system.
+
+**Where the files actually live:** `uploads/forms/`, served straight from disk
+by nginx. So **the downloads keep working even if the Python portal is
+stopped**, and they work on GitHub Pages with nothing running at all. The list
+of forms is `forms-data.js`, written by the portal exactly the way
+`people-data.js` and `notices-data.js` are.
+
+**What the office gets** — Portal → **Forms**:
+
+| | |
+|---|---|
+| Add | a title, the file (PDF or Word, up to 10 MB), and optionally a group and one line of explanation |
+| Replace | a newer version of a form **keeps the same download link**, so anything already printed or e-mailed still works |
+| Hide | take a form off the website without losing it — for when one is out of date and the new one has not arrived |
+| Reorder | ▲ ▼; the public page keeps your order, and each group sits where its first form does |
+| Delete | removes the file as well |
+
+The public page groups the forms, shows a PDF or Word badge, the file size and
+when each was last updated, and has a search box for when the list gets long.
+
+**What is checked on upload:** the file must really be a PDF or a Word file —
+the first bytes are read rather than the name trusted, and a `.docx` is opened
+as a zip and must contain the `word/` folder a genuine Word document has. Under
+10 MB. The stored filename is made from the title, never taken from the upload,
+so a crafted name cannot escape the folder. Two forms with the same title get
+`-2`, `-3`; nothing is overwritten by accident. Every add, edit, reorder and
+delete is in the activity log with who did it.
+
+Uploading is the **office** and the **admin** — this is website content like
+Notices and the Gallery, not booking authority.
+
+| File | |
+|---|---|
+| `backend/forms.py` | **new** — the whole feature, server side; installed the same way `bookings.py` is, so deleting one block in `server.py` switches it off |
+| `backend/test_forms.py` | **new** — 43 checks |
+| `forms.html`, `forms.js`, `forms-data.js` | **new** — the public page |
+| `portal/forms.js` | **new** — the Forms screen |
+| `FORMS.md` | **new** — the guide, including what to check when a form does not appear |
+| `style.css`, `portal/portal.css` | the download list, the badges, the add/edit panel |
+| `backend/server.py` | installs the module; `forms-data.js` added to Export for website |
+| all 12 public pages | the **Forms** link in the header |
+
+### Three booking fixes you asked for
+
+* **Booking records** were already open to the office and the Head as well as
+  the admin — confirmed, nothing to change.
+* **"Still to come"** is a new filter button on Booking records: confirmed
+  bookings from today onwards, so the Head and the office can see what is
+  coming without setting a date range.
+* **Booking requests** is now in the **Head's** menu as well, read-only. The
+  buttons are the office's; a line at the top says so and points him at
+  Approvals. He often wants to see what is on their desk before it reaches him.
+
+### Housekeeping
+
+* `assets/IIT_Kharagpur_Logo.svg` is not in this build. `assets/iitkgp-logo.svg`
+  is the one to keep: same artwork, but with a `viewBox` added (without it the
+  file cannot be scaled by CSS at all) and the empty metadata stripped, and it
+  is the name the docs and the PNG build command use. **Delete the other one
+  from your folder** — unzipping cannot do it for you.
+* `backend/test_forms.py` points uploads at its own throwaway folder, so no test
+  run can write into the live `uploads/` folder.
+* All 17 HTML files are on `?v=37`.
+* **313 checks** across four suites: 165 + 62 + 47 + 43.
+
+---
+
+## 25 November 2026 — The admin monitors through the record, and nothing else
+
+Last time the admin lost the *power* to decide a booking, but kept the screens:
+**Booking requests**, **Approvals** and **Today** were still in its menu, with
+their office-and-Head wording and a Withdraw button. That still reads as booking
+authority, which is what you said. Gone now.
+
+### What the admin's Rooms menu is
+
+| Before | Now |
+|---|---|
+| Book a room | Book a room |
+| Booking requests | — |
+| Today | — |
+| Approvals | — |
+| Booking records | **Booking records** |
+| Rooms & halls | Rooms & halls |
+
+**Booking records** is the whole history — every booking, every state,
+searchable by reference number, name, e-mail, roll number, phone, purpose or
+room, with the step-by-step story of each one. That is how the admin monitors
+everything, and it is the only booking screen it has.
+
+**Withdraw is gone from the admin too.** It was kept last time as damage
+control; "the log only" settles it. If a room has to be freed in a hurry the
+office does it, or that person gets the `office` role in Accounts — which is
+itself recorded in the activity log.
+
+### Three tiers instead of two
+
+| | |
+|---|---|
+| `may_office()` / `may_hod()` | may **act** |
+| `may_desk()` **(new)** | may open the **working screens** — queue, Approvals, Today, the checklist. Office and Head only |
+| `may_watch()` | may read the **records**. Office, Head and admin |
+
+| File | Change |
+|---|---|
+| `backend/bookings.py` | new `may_desk()` and `require_desk()`; `api_queue`, `api_hod`, `api_today`, `api_office_check` and `api_revoke` moved to it; `may_watch()` now covers the records alone; the refusal message points the admin at Booking records |
+| `portal/bookings.js` | the admin's menu loses Booking requests, Today and Approvals; the records page carries a note explaining the account's part and how to grant the `office` role |
+| `backend/test_bookings.py` | **165 checks** (was 161) — the admin is refused on all four screens and on Withdraw, and the office is checked to still have them |
+| `BOOKINGS.md`, `HOW-TO-UPDATE.md` | roles table and reasoning rewritten |
+| all 17 HTML files | `?v=36` |
+
+Unchanged: the admin still owns rooms, accounts, blackout dates, the ordinary
+booking rules, Export, Backup & restore and System health. Standing approval
+stays the Head's.
+
+---
+
 ## 24 November 2026 (evening) — The admin can watch, but not decide
 
 You noticed the admin account could reject a booking and asked whether it should

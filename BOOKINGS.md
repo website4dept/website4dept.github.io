@@ -160,35 +160,40 @@ of requests per address per hour are capped.
 | `member` (faculty, scholars, postdocs, staff) | Book a room | Ask for a room, follow their own requests, cancel them |
 | `office` | Book a room, Booking requests, Today, Booking records | Every request lands here. Forward a hall to the Head, confirm a classroom, confirm what the Head has approved, return or reject anything, withdraw a confirmed booking, mark a no-show. One shared account: two people signed in at a time, a third signs the oldest out |
 | `hod` | Book a room, Approvals, Today, Booking records | Approve or reject what the office has forwarded, in bulk or a whole date at once; give standing approval; withdraw a booking |
-| `admin` | all of the above, plus Rooms & halls, Accounts, System health | **Sees every booking screen; decides none of them.** Rooms, accounts, blackout dates, settings, System health — and withdrawing a confirmed booking |
+| `admin` | Book a room, **Booking records**, Rooms & halls (plus the rest of the portal) | **Reads the record of every booking and takes no part in any of them.** Rooms, accounts, blackout dates, settings, System health |
 
 A faculty member who is also the Head gets the `hod` role — they keep their own
 profile editing, because that does not depend on the role.
 
-### Why the admin cannot decide a booking
+### Why the admin takes no part in bookings
 
 Deciding a booking is an authority decision, not a technical one. The point of
 splitting approval from confirmation is that **two different people touch each
 booking**; one account able to do both steps would remove that in a single
-click. So `may_office()` and `may_hod()` in `bookings.py` mean *may act as*, and
-no longer include `admin`; a separate `may_watch()` covers the screens that only
-show things.
+click. And the working screens belong to the people who work them: a queue is a
+to-do list, and the admin has nothing to do on it.
 
-What the admin gets instead:
+So the admin's booking menu is **Booking records** — the whole history, every
+state, searchable — and that is all. No Booking requests, no Approvals, no
+Today's sheet. Nothing to press anywhere.
 
-* every booking screen, read-only — the queue, Approvals, Today, the records,
-  and the pre-forward checklist (as **See the checklist**, with nothing to press)
-* a note at the top of each page saying so
-* **Withdraw**, which is kept on purpose: it frees a room rather than claiming
-  one, and everybody involved is e-mailed, so it cannot be done quietly
-* the settings, because those are configuration — **except** standing approval
-  (`auto_rooms`, `auto_until`), which decides which bookings skip the Head and
-  is therefore his to give
+Three tiers in the code, in `bookings.py`:
 
-If the admin really must act on a booking, the answer is to sign in as the
-office, or give that person the `office` role — which is itself recorded in the
-activity log. The browser hides the buttons and the server refuses the request,
-so a page left open from yesterday cannot get round it.
+| | |
+|---|---|
+| `may_office(u)` / `may_hod(u)` | may **act** — forward, return, refuse, approve, confirm, withdraw, no-show, publish |
+| `may_desk(u)` | may open the **working screens** — the queue, Approvals, Today, the pre-forward checklist. Office and Head only |
+| `may_watch(u)` | may read the **records**. Office, Head and admin |
+
+The one setting that is not the admin's either is **standing approval**
+(`auto_rooms`, `auto_until`): it decides which bookings skip the Head
+altogether, so it is his to give. The ordinary rules — hours, how far ahead,
+blackout dates — are configuration and the admin may change them.
+
+If the admin really must act on a booking, the answer is to give that person the
+`office` role in Accounts, which is itself recorded in the activity log. The
+browser hides what they cannot use and the server refuses it as well, so a page
+left open from yesterday cannot get round it.
 
 ---
 

@@ -29,9 +29,22 @@
   const watchNote = whose =>
     !watchOnly() ? '' :
     '<div class="bk-watch"><strong>You are signed in as the admin.</strong> ' +
-    'You can see everything on this page, but deciding a booking needs the ' + whose + '. ' +
-    'You can still withdraw a confirmed booking, because that frees a room rather than ' +
-    'claiming one and everybody involved is told.</div>';
+    'You can see everything on this page, but deciding a booking needs the ' + whose + '.</div>';
+
+  // The office queue can be opened by the Head as well, so say whose desk it is.
+  const queueNote = () =>
+    canOffice() ? '' :
+    watchOnly() ? watchNote('department office account') :
+    '<div class="bk-watch">This is the <strong>department office\u2019s desk</strong>, shown to you so ' +
+    'you can see what is coming. Forwarding, returning and refusing are theirs to do. ' +
+    'What is waiting for you is on <a href="#bkapprovals">Approvals</a>.</div>';
+
+  const recordsNote = () =>
+    !watchOnly() ? '' :
+    '<div class="bk-watch"><strong>You are signed in as the admin.</strong> ' +
+    'This is the whole record, so you can follow anything that happens — but acting on a ' +
+    'booking is the department office’s job, or the Head’s. If somebody needs to be able to ' +
+    'act, give them the <strong>office</strong> role in Accounts rather than this one.</div>';
 
   /* ---------- small helpers ---------- */
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -318,7 +331,7 @@
         'then forward a seminar hall to the Head of the Department or confirm a classroom yourself. ' +
         'The Head is only e-mailed once you forward. When he approves, the booking comes back to you ' +
         'in “Ready to confirm” — nothing reaches the person who asked until you confirm it.') +
-      watchNote('department office account') + empty + warn +
+      queueNote() + empty + warn +
       '<div class="stat-grid">' +
         '<div class="stat-card"><strong>' + c.pending + '</strong><span>waiting for you</span></div>' +
         '<div class="stat-card"><strong>' + c.forwarded + '</strong><span>with the Head, not yet approved</span></div>' +
@@ -529,6 +542,7 @@
         'Every room request ever made, whatever became of it. Search by reference number, ' +
         'name, e-mail address, roll number, phone number, purpose or room. Click any row to ' +
         'see everything that happened to that booking and who did it.') +
+      recordsNote() +
       '<form class="rec-bar" id="recForm">' +
         '<input type="search" id="recQ" placeholder="MA-B-2026-0042, a name, a roll number…" ' +
           'value="' + esc(REC.q) + '" aria-label="Search the booking records">' +
@@ -882,9 +896,13 @@
     nav: function(items, me){
       items.push(['Rooms']);
       items.push(['bookings', '🏛', 'Book a room']);
-      if (me.role === 'office' || me.role === 'admin') items.push(['bkqueue', '📋', 'Booking requests']);
-      if (me.role === 'office' || me.role === 'hod' || me.role === 'admin') items.push(['bktoday', '📅', 'Today']);
-      if (me.role === 'hod' || me.role === 'admin') items.push(['bkapprovals', '✅', 'Approvals']);
+      // The working screens belong to the people who work them. The admin gets
+      // the record of every booking instead - see "Who sees what" in BOOKINGS.md.
+      // The Head can look at the office's desk too - read-only, the buttons are
+      // drawn only for the office. He often wants to see what is coming.
+      if (me.role === 'office' || me.role === 'hod') items.push(['bkqueue', '📋', 'Booking requests']);
+      if (me.role === 'office' || me.role === 'hod') items.push(['bktoday', '📅', 'Today']);
+      if (me.role === 'hod') items.push(['bkapprovals', '✅', 'Approvals']);
       if (me.role === 'office' || me.role === 'hod' || me.role === 'admin') items.push(['bkrecords', '🗃', 'Booking records']);
       if (me.role === 'admin') items.push(['bkrooms', '🗝', 'Rooms & halls']);
     }

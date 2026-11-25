@@ -414,8 +414,9 @@ def missing_addresses():
 # rather than claiming it, and everyone involved is e-mailed, so it cannot be
 # done quietly.
 # ---------------------------------------------------------------------------
-ADMIN_ONLY_WATCHES = ("You are signed in as the admin, which can see every booking but not decide one. "
-                      "Sign in as the department office, or ask the Head of the Department.")
+ADMIN_ONLY_WATCHES = ("You are signed in as the admin. It can read the record of every booking "
+                      "(Booking records) but takes no part in them. Sign in as the department "
+                      "office, or ask the Head of the Department.")
 
 
 def may_office(u):
@@ -428,8 +429,13 @@ def may_hod(u):
     return u["role"] == "hod"
 
 
+def may_desk(u):
+    """May open the day-to-day working screens: the queue, Approvals, Today."""
+    return u["role"] in ("office", "hod")
+
+
 def may_watch(u):
-    """May SEE the office and HoD screens, and the booking records."""
+    """May read the booking records - the office, the Head, and the admin."""
     return u["role"] in ("office", "hod", "admin")
 
 
@@ -451,8 +457,19 @@ def require_hod(req):
     return u
 
 
+def require_desk(req):
+    """
+    For the working screens. The admin is deliberately not here: it monitors
+    through the records instead, and takes no part in a booking.
+    """
+    u = S.require_ready_user(req)
+    if not may_desk(u):
+        raise no_entry(u, "This section is for the department office and the Head.")
+    return u
+
+
 def require_watch(req):
-    """For the screens that only show things."""
+    """For the booking records, which the admin may read."""
     u = S.require_ready_user(req)
     if not may_watch(u):
         raise S.ApiError(403, "This section is for the department office and the Head.")
@@ -1014,7 +1031,7 @@ def blockers(b, room):
 
 def api_office_check(req, bid):
     """The checklist the office sees before forwarding or confirming."""
-    require_watch(req)
+    require_desk(req)
     b = booking_row(int(bid))
     room = room_row(b["room_id"])
     checks = office_checks(b, room)
@@ -1028,7 +1045,7 @@ def api_office_check(req, bid):
 
 
 def api_queue(req):
-    require_watch(req)
+    require_desk(req)
     rows = S.q("SELECT * FROM bookings WHERE status IN ('pending','returned','forwarded')"
                " ORDER BY on_date, t_start").fetchall()
     out = []
@@ -1211,7 +1228,7 @@ def confirm_booking(req, b, u, note=""):
 
 
 def api_hod(req):
-    require_watch(req)
+    require_desk(req)
     c = cfg()
     waiting = S.q("SELECT * FROM bookings WHERE status='forwarded' ORDER BY on_date, t_start").fetchall()
     recent = S.q("SELECT * FROM bookings WHERE status IN ('approved','rejected') ORDER BY id DESC LIMIT 40").fetchall()
@@ -1299,10 +1316,8 @@ def api_decide_many(req):
 def api_revoke(req, bid):
     """Take back a booking that was already confirmed (institute event, clash, mistake)."""
     u = S.require_ready_user(req)
-    # The admin may do this one: it frees a room rather than claiming one, and
-    # everybody involved is e-mailed about it.
-    if not may_watch(u):
-        raise S.ApiError(403, "Only the office or the Head can take back a confirmed booking.")
+    if not may_desk(u):
+        raise no_entry(u, "Only the office or the Head can take back a confirmed booking.")
     b = booking_row(int(bid))
     if b["status"] != "approved":
         raise S.ApiError(400, "That booking is not confirmed.")
@@ -1665,17 +1680,25 @@ def api_publish_notice(req, bid):
 # ---------------------------------------------------------------------------
 PER_PAGE = 25
 
-# label -> the condition that selects it. Order matters: it is the order of the
-# filter buttons on the screen.
-RECORD_FILTERS = [
-    ("all",       "Everything",              ""),
-    ("confirmed", "Confirmed",               "status='approved' AND confirmed=1"),
-    ("awaiting",  "Waiting for the office",  "status='approved' AND confirmed=0"),
-    ("hod",       "With the Head",           "status='forwarded'"),
-    ("office",    "With the office",         "status IN ('pending','returned')"),
-    ("rejected",  "Refused",                 "status='rejected'"),
-    ("cancelled", "Cancelled",               "status='cancelled'"),
-]
+def record_filters():
+    """
+    key -> (button label, the condition that selects it). The order here is the
+    order of the buttons on the screen.
+
+    The one date in here comes from the server's own clock by way of
+    today_local(), never from the browser, so it is safe to write into the SQL.
+    """
+    today = today_local()
+    return [
+        ("all",       "Everything",              ""),
+        ("upcoming",  "Still to come",           "status='approved' AND confirmed=1 AND on_date>='{}'".format(today)),
+        ("confirmed", "Confirmed",               "status='approved' AND confirmed=1"),
+        ("awaiting",  "Waiting for the office",  "status='approved' AND confirmed=0"),
+        ("hod",       "With the Head",           "status='forwarded'"),
+        ("office",    "With the office",         "status IN ('pending','returned')"),
+        ("rejected",  "Refused",                 "status='rejected'"),
+        ("cancelled", "Cancelled",               "status='cancelled'"),
+    ]
 
 # label -> the ORDER BY it maps to. Never build this from user input directly.
 RECORD_SORTS = {
@@ -1720,14 +1743,15 @@ def api_records(req):
 
     # how many there are in each state, for the filter buttons - worked out
     # before the state filter is applied, so the numbers do not all become 0
+    filters = record_filters()
     counts = {}
-    for key, _label, cond in RECORD_FILTERS:
+    for key, _label, cond in filters:
         w = list(where) + ([cond] if cond else [])
         sql = "SELECT COUNT(*) c FROM bookings" + (" WHERE " + " AND ".join(w) if w else "")
         counts[key] = S.q1(sql, tuple(args))["c"]
 
     state = str(req.query.get("status") or "all")
-    cond = dict((k, c) for k, _l, c in RECORD_FILTERS).get(state, "")
+    cond = dict((k, c) for k, _l, c in filters).get(state, "")
     if cond:
         where.append(cond)
 
@@ -1757,7 +1781,7 @@ def api_records(req):
     return {"rows": out, "total": total, "page": page, "pages": pages, "per_page": PER_PAGE,
             "term": term, "status": state, "sort": sort, "dir": direction.lower(),
             "counts": counts,
-            "filters": [{"key": k, "label": l} for k, l, _c in RECORD_FILTERS],
+            "filters": [{"key": k, "label": l} for k, l, _c in filters],
             "rooms": [room_public(r) for r in S.q("SELECT * FROM rooms ORDER BY sort, name").fetchall()]}
 
 
@@ -1789,8 +1813,8 @@ def api_record(req, bid):
 # ---------------------------------------------------------------------------
 def api_today(req):
     u = S.require_ready_user(req)
-    if not may_watch(u):
-        raise S.ApiError(403, "This sheet is for the department office.")
+    if not may_desk(u):
+        raise no_entry(u, "This sheet is for the department office.")
     day = ymd(req.query.get("date") or today_local())
     rooms = [room_public(r) for r in S.q("SELECT * FROM rooms WHERE active=1 ORDER BY sort, name").fetchall()]
     rows = S.q("SELECT * FROM bookings WHERE on_date=? AND status='approved' ORDER BY t_start", (day,)).fetchall()
@@ -1874,9 +1898,10 @@ def api_settings(req):
     waits in "Ready to confirm".
     """
     u = S.require_ready_user(req)
-    # Settings are configuration, so the admin may change them - except the
-    # Head's standing approval, which decides which bookings skip him and is
-    # therefore his to give, not the system keeper's.
+    # Settings are configuration - the hours rooms may be booked, how far ahead,
+    # which dates are blocked - so the admin may change them.  Standing approval
+    # is not configuration: it decides which bookings skip the Head, so it stays
+    # his to give.
     boss = may_hod(u) or u["role"] == "admin"
     if not (boss or may_office(u)):
         raise S.ApiError(403, "Only the department office, the Head or an admin can change these.")

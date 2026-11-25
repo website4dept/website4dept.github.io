@@ -86,7 +86,12 @@ want to close it too, move those into `portal/portal.css` and drop
 * **Everything shown on a page is escaped** before it is put into the HTML.
 * **File paths are checked** before anything is read from disk, so a crafted
   address cannot walk up out of the website folder.
-* **Uploads** are size-limited and only known image types are accepted.
+* **Uploads** are size-limited and the file is identified by reading its first
+  bytes, not by trusting its name. Photos must really be JPG, PNG or WebP; a
+  departmental form must really be a PDF or a Word file, and a `.docx` is
+  opened as a zip and must contain the `word/` folder a real Word document has.
+  Stored filenames are generated from the title, never taken from the upload,
+  so a crafted name cannot escape the folder.
 * **Roll numbers and phone numbers never reach the public website.** They are
   visible to the office and the Head inside the portal and nowhere else. A
   student's booking is shown publicly under the faculty advisor's name.
