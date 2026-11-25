@@ -4,6 +4,84 @@ Newest first. Each entry says what was asked for, which files changed, and why.
 
 ---
 
+## 25 November 2026 (evening) — The approval flow, as you spelled it out
+
+Seven decisions, all built.
+
+### Seminar halls only
+
+Every room needed the Head's approval, **classrooms included** — a make-up class
+in NC-141 was landing on his desk. Halls now need him; classrooms are the
+office's to confirm. It stays a tick per room in Rooms & halls, and existing
+installs are put right once on startup without overwriting a deliberate choice.
+
+### Two people after the same slot
+
+A double booking was already impossible. What this adds is the choosing. When
+the office forwards or confirms a contested slot, the checklist now lists
+everyone else who wants it, **oldest request first**, marks who asked first, and
+lists separately the other requests for that room that day that do not overlap.
+Each overlapping one has a tick box; the button changes to read *"Forward, and
+refuse 2 others"* once anything is ticked, so nobody turns three people down by
+accident.
+
+**One reason, typed once, is required** — and each applicant gets their **own**
+e-mail, never a group one, so nobody sees anybody else's address. Only requests
+actually shown on screen can be refused; the server checks the list again.
+
+### The Head's page
+
+Two proper lists now, in place of *"the last few you decided"*:
+
+* **Approved** — last 50, each showing whether the office has confirmed it yet,
+  with a count in the heading of how many are still with them, and Withdraw
+* **Rejected** — last 50, **with the reason given**
+
+Anything older is in Booking records, which he has in full.
+
+### Clearing several at once
+
+| Who | What |
+|---|---|
+| Head | one button per **date**, one per **room**, or tick several |
+| Office | one button per date: **forward** everything waiting, or **confirm** everything the Head has approved |
+
+The office's buttons run the full checklist on each booking separately, leave
+behind anything that fails, and report which and why — so a bulk click can never
+wave through what a single click would have stopped.
+
+### The Head can hand the whole step over
+
+Approvals → **"Let the department office handle room approvals."** With it on he
+is sent nothing and asked nothing: forwarding a hall approves it in his name on
+the spot and sends it to the office to confirm.
+
+**He can only switch it on when nothing is waiting for him** — the tick box is
+disabled until his list is clear and says why. Otherwise those requests would be
+stranded on a page he had stopped visiting. Only he can set it; the office is
+told on their page when it is on.
+
+### Queues in the order people asked
+
+Both queues now sort **oldest request first**, and every row shows when it was
+asked. The office still decides — first in the queue is information, not a rule.
+
+| File | Change |
+|---|---|
+| `backend/bookings.py` | `hod_approval_off` setting with its guard; `competitors()`, `same_day()`, `refuse_others()`; `api_office_many()` for the office's bulk buttons; `decide-many` gained a room filter; queues ordered by arrival; classrooms seeded and migrated off the Head; `decided_at` added to what the browser gets |
+| `portal/bookings.js` | the competing-requests block and its reason box; the self-labelling button; Approved and Rejected lists; the handover switch; per-room and per-date bulk buttons; asked-on column |
+| `portal/portal.css` | the rivals block, the reason field, the asked-on line |
+| `backend/test_bookings.py` | **202 checks** (was 165) — 37 new, covering every rule above |
+| `BOOKINGS.md`, `HOW-TO-UPDATE.md` | rewritten to match |
+| all 17 HTML files | `?v=39` |
+
+Unchanged, as you said: who may book, the office checklist, the office
+"confirm as soon as the HoD approves" switch, and every e-mail.
+
+**354 checks** across four suites: 202 + 62 + 47 + 43.
+
+---
+
 ## 25 November 2026 — Department forms, and three booking fixes
 
 ### New: forms people can download
@@ -66,6 +144,16 @@ Notices and the Gallery, not booking authority.
 * **Booking requests** is now in the **Head's** menu as well, read-only. The
   buttons are the office's; a line at the top says so and points him at
   Approvals. He often wants to see what is on their desk before it reaches him.
+
+### Two late additions to the same batch
+
+* **The Forms page asks the portal first.** It calls `/api/forms` and falls back
+  to `forms-data.js` only when nothing answers — which is how GitHub Pages
+  previews it. So on the department server, and when you run it on your own
+  machine, a new form appears the moment it is added, with no export step. The
+  export still matters for the GitHub Pages copy.
+* **`try-it.py` seeds five sample forms**, so Portal → Forms and the public
+  Forms page both have something on them the first time you look.
 
 ### Housekeeping
 

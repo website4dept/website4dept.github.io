@@ -24,6 +24,21 @@
 
   var ALL = Array.isArray(window.DEPT_FORMS) ? window.DEPT_FORMS : [];
 
+  /* Two ways of getting the list, in this order:
+       1. ask the portal (/api/forms) - always current, no export step needed.
+          This is what happens on the department server and when you run it on
+          your own machine.
+       2. forms-data.js, already loaded above - used when there is no server
+          behind the page at all, which is how GitHub Pages previews it.
+     Either way the page draws the same thing. */
+  function live() {
+    if (typeof fetch !== 'function') return Promise.resolve(null);
+    return fetch('api/forms', { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { return d && Array.isArray(d.forms) ? d.forms : null; })
+      .catch(function () { return null; });
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -110,4 +125,9 @@
   if (BOX) {
     BOX.addEventListener('input', function () { draw(search(BOX.value)); });
   }
+  live().then(function (fresh) {
+    if (!fresh) return;                 // no server behind this page; keep the file's list
+    ALL = fresh;
+    draw(BOX && BOX.value ? search(BOX.value) : ALL);
+  });
 })();

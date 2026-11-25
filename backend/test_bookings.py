@@ -438,6 +438,141 @@ check("the office can", s == 200, (s, d.get("error")))
 check("which frees the room", booking_status(BA) == "cancelled", booking_status(BA))
 check("and the booker is told", any("CANCELLED" in m for m in last_office_mails()), "nothing sent")
 
+print("\n--- classrooms never reach the Head ---")
+check("a classroom does not need his approval",
+      server.q1("SELECT needs_hod FROM rooms WHERE id=?", (ROOM,))["needs_hod"] == 0)
+check("a seminar hall does",
+      server.q1("SELECT needs_hod FROM rooms WHERE id=?", (HALL,))["needs_hod"] == 1)
+DC = (server.now() + server.timedelta(days=33)).strftime("%Y-%m-%d")
+s, d = prof("POST", "/api/bookings", {"room_id": ROOM, "date": DC, "start": "09:00", "end": "10:00",
+                                      "title": "Make-up class"})
+BC = d["booking"]["id"]
+s, d = office("POST", "/api/bookings/%d/office" % BC, {"action": "confirm"})
+check("so the office confirms it straight off", s == 200 and d.get("confirmed"), (s, d))
+
+print("\n--- two people after the same slot ---")
+DR = (server.now() + server.timedelta(days=35)).strftime("%Y-%m-%d")
+server.q("UPDATE rooms SET auto_ok=0 WHERE id=?", (HALL,))
+s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DR, "start": "10:00", "end": "12:00",
+                                      "title": "First to ask"})
+R1 = d["booking"]["id"]
+s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DR, "start": "11:00", "end": "13:00",
+                                      "title": "Second, overlapping"})
+R2 = d["booking"]["id"]
+check("an overlapping request is accepted, not blocked", s == 200, (s, d.get("error")))
+s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DR, "start": "15:00", "end": "16:00",
+                                      "title": "Same day, no overlap"})
+R3 = d["booking"]["id"]
+# make the order of asking unambiguous
+for n, bid in ((90, R1), (40, R2), (10, R3)):
+    server.q("UPDATE bookings SET created=? WHERE id=?",
+             (server.iso(server.now() - server.timedelta(minutes=n)), bid))
+
+s, d = office("GET", "/api/bookings/%d/check" % R2)
+check("the checklist names who else wants the slot", len(d["competitors"]) == 1, d.get("competitors"))
+check("and says they asked first", d["competitors"][0]["earlier"] is True, d["competitors"][0])
+check("the non-overlapping one is listed apart",
+      len(d["same_day"]) == 1 and d["same_day"][0]["id"] == R3, d.get("same_day"))
+s, d = office("GET", "/api/bookings/%d/check" % R1)
+check("and from the other side, the later one is not marked as first",
+      d["competitors"][0]["earlier"] is False, d["competitors"][0])
+
+s, d = office("POST", "/api/bookings/%d/office" % R1, {"action": "forward", "refuse": [R2]})
+check("refusing the others without a reason is not allowed", s == 400, (s, d.get("error", "")[:40]))
+check("so nothing happened to them", booking_status(R2) == "pending", booking_status(R2))
+s, d = office("POST", "/api/bookings/%d/office" % R1,
+              {"action": "forward", "refuse": [R3], "refuse_note": "Nope."})
+check("a request that does not overlap cannot be swept up",
+      s == 200 and booking_status(R3) == "pending", (s, booking_status(R3)))
+
+s, d = office("POST", "/api/bookings/%d/office" % R2,
+              {"action": "forward", "refuse": [R1],
+               "refuse_note": "The room went to an earlier request for the same slot."})
+check("the office can give the slot to one and refuse the other", s == 200, (s, d.get("error")))
+check("the refused one is marked rejected", booking_status(R1) == "rejected", booking_status(R1))
+check("with the reason recorded",
+      "earlier request" in (server.q1("SELECT decision_note n FROM bookings WHERE id=?", (R1,))["n"] or ""),
+      server.q1("SELECT decision_note n FROM bookings WHERE id=?", (R1,))["n"])
+check("and the person told", any("NOT APPROVED" in m or "not approved" in m.lower()
+                                 for m in last_office_mails()), "nothing sent")
+
+print("\n--- the Head hands room approvals to the office ---")
+s, d = office("PUT", "/api/bookings/settings", {"hod_approval_off": True})
+check("the office cannot switch it on", s == 403, s)
+s, d = hod("PUT", "/api/bookings/settings", {"hod_approval_off": True})
+check("nor can the Head while requests are still waiting for him", s == 409, (s, d.get("error", "")[:50]))
+# clear his desk: approve what can be approved, refuse whatever clashes
+for r in server.q("SELECT id FROM bookings WHERE status='forwarded'").fetchall():
+    hod("POST", "/api/bookings/%d/decide" % r["id"], {"action": "approve"})
+    if booking_status(r["id"]) == "forwarded":
+        hod("POST", "/api/bookings/%d/decide" % r["id"], {"action": "reject", "note": "Clash."})
+s, d = hod("GET", "/api/bookings/hod")
+check("with his desk clear the switch is offered", d["can_switch_off"] is True, d.get("can_switch_off"))
+s, d = hod("PUT", "/api/bookings/settings", {"hod_approval_off": True})
+check("and he can switch it on", s == 200, (s, d.get("error")))
+s, d = office("GET", "/api/bookings/queue")
+check("the office is told", d["hod_approval_off"] is True, d.get("hod_approval_off"))
+
+DH = (server.now() + server.timedelta(days=37)).strftime("%Y-%m-%d")
+s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DH, "start": "10:00", "end": "11:00",
+                                      "title": "Hall while he is hands-off"})
+BH = d["booking"]["id"]
+s, d = office("POST", "/api/bookings/%d/office" % BH, {"action": "forward"})
+check("forwarding a hall now approves it on the spot", s == 200 and d["status"] == "approved", (s, d))
+check("it never sat with the Head", booking_status(BH) == "approved", booking_status(BH))
+check("and it still waits for the office to confirm", not is_confirmed(BH), "confirmed too early")
+s, d = hod("PUT", "/api/bookings/settings", {"hod_approval_off": False})
+check("he can take it back", s == 200, s)
+
+print("\n--- clearing a whole day, and a whole room ---")
+DB = (server.now() + server.timedelta(days=39)).strftime("%Y-%m-%d")
+batch = []
+for t0, t1, title in (("09:00", "10:00", "Bulk A"), ("11:00", "12:00", "Bulk B"), ("13:00", "14:00", "Bulk C")):
+    s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DB, "start": t0, "end": t1, "title": title})
+    batch.append(d["booking"]["id"])
+s, d = office("POST", "/api/bookings/office-many", {"action": "forward", "date": DB})
+check("the office can forward a whole day at once", s == 200 and len(d["done"]) == 3, (s, d))
+check("and every one went to the Head",
+      all(booking_status(i) == "forwarded" for i in batch), [booking_status(i) for i in batch])
+s, d = hod("POST", "/api/bookings/decide-many", {"room": HALL, "action": "approve", "note": "Hall cleared."})
+check("the Head can clear a whole room in one click", s == 200 and d["done"] >= 3, (s, d))
+s, d = office("POST", "/api/bookings/office-many", {"action": "confirm", "date": DB})
+check("and the office confirms the whole day", s == 200 and len(d["done"]) == 3, (s, d))
+check("so all three are confirmed", all(is_confirmed(i) for i in batch), [is_confirmed(i) for i in batch])
+
+print("\n--- the bulk buttons still check each one ---")
+DX = (server.now() + server.timedelta(days=41)).strftime("%Y-%m-%d")
+s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DX, "start": "10:00", "end": "11:00",
+                                      "title": "Will be taken"})
+X1 = d["booking"]["id"]
+s, d = prof("POST", "/api/bookings", {"room_id": HALL, "date": DX, "start": "10:30", "end": "11:30",
+                                      "title": "Clashes with it"})
+X2 = d["booking"]["id"]
+office("POST", "/api/bookings/%d/office" % X1, {"action": "forward"})
+hod("POST", "/api/bookings/%d/decide" % X1, {"action": "approve"})
+office("POST", "/api/bookings/%d/office" % X1, {"action": "confirm"})
+s, d = office("POST", "/api/bookings/office-many", {"action": "forward", "date": DX})
+check("a clashing one is left behind rather than waved through",
+      s == 200 and len(d["held"]) == 1 and d["held"][0]["ref"], (s, d))
+check("and it says why", "free" in d["held"][0]["why"].lower() or "booked" in d["held"][0]["why"].lower(),
+      d["held"][0]["why"])
+check("so it is still on the office desk", booking_status(X2) == "pending", booking_status(X2))
+
+print("\n--- the Head's two lists ---")
+s, d = hod("GET", "/api/bookings/hod")
+check("approved and rejected come back separately",
+      isinstance(d.get("approved"), list) and isinstance(d.get("rejected"), list), list(d))
+check("the one refused over the clash is in the rejected list",
+      any(x["id"] == R1 for x in d["rejected"]), [x["ref"] for x in d["rejected"]])
+check("and the reason travels with it",
+      any(x["id"] == R1 and "earlier request" in (x["note"] or "") for x in d["rejected"]), "")
+check("the Head also sees which rooms have something waiting", "rooms_waiting" in d, list(d))
+
+print("\n--- the queues are in the order people asked ---")
+s, d = office("GET", "/api/bookings/queue")
+made = [b["created"] for b in d["queue"]]
+check("office queue: oldest request first", made == sorted(made), made[:3])
+
 print("\n--- the booking records: search, filter, sort ---")
 s, d = prof("GET", "/api/bookings/records")
 check("faculty cannot read the records", s == 403, s)

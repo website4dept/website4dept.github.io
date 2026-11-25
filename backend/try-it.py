@@ -21,6 +21,7 @@ saved in backend/data/outbox/ instead of being sent.
 Run it again any time to start over (it wipes the database first).
 """
 
+import io
 import json
 import os
 import shutil
@@ -121,6 +122,7 @@ def main():
              "Ratna Dutta", seeded_by, FACULTY_ID, "Ratna Dutta", me))
         server.q("UPDATE bookings SET ref=? WHERE id=?",
                  ("MA-B-{}-{:04d}".format(day(n)[:4], cur.lastrowid), cur.lastrowid))
+    seed_forms(domain)
 
     print("""
 =====================================================================
@@ -157,6 +159,54 @@ START OVER
   python3 try-it.py {me}
 =====================================================================
 """.format(me=me, pw=PASSWORD, dom=domain))
+
+
+def seed_forms(domain):
+    """
+    A few blank forms, so Portal -> Forms and the public Forms page both have
+    something on them the first time you look. Real ones replace these: Edit,
+    choose your file, Save.
+    """
+    import server                                   # already set up by main()
+    try:
+        import forms
+    except ImportError:
+        return
+    if server.q1("SELECT COUNT(*) c FROM forms")["c"]:
+        return
+    samples = [
+        ("Casual Leave (CL)", "One or two days at a time. Countersigned by the Head.", "Leave"),
+        ("Medical / Sick Leave", "Attach the certificate for more than three days.", "Leave"),
+        ("Restricted Holiday (RH)", "", "Leave"),
+        ("Travel Allowance claim", "Attach tickets and boarding passes.", "Travel"),
+        ("No-dues certificate", "", ""),
+    ]
+    at = server.iso(server.now())
+    for i, (title, blurb, grp) in enumerate(samples):
+        # A real, if very plain, PDF saying what it is a placeholder for.
+        body = ("BT /F1 14 Tf 60 700 Td ({} - sample form) Tj ET").format(
+            title.replace("(", "").replace(")", ""))
+        blob = ("%PDF-1.4\n"
+                "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+                "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+                "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]"
+                "/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>endobj\n"
+                "4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n"
+                "5 0 obj<</Length {}>>stream\n{}\nendstream endobj\n"
+                "trailer<</Root 1 0 R>>\n%%EOF\n").format(len(body), body).encode()
+        slug = forms.slugify(title)
+        forms.write_file(slug, "pdf", blob)
+        server.q("INSERT INTO forms(title,blurb,grp,slug,ext,original,bytes,sort,active,"
+                 "added,updated,by) VALUES(?,?,?,?,'pdf',?,?,?,1,?,?,?)",
+                 (title, blurb, grp, slug, slug + ".pdf", len(blob), i + 1, at, at,
+                  "office.demo@" + domain))
+    # Also write forms-data.js, so the Forms page still lists them if you open
+    # the .html files straight from the folder with no server running.
+    io.open(os.path.join(server.CFG["site_root"], "forms-data.js"), "w",
+            encoding="utf-8").write(forms.forms_js())
+    print("  5 sample forms added (Portal -> Forms, and the Forms link on the website)")
+
+
     return 0
 
 

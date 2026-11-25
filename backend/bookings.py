@@ -122,12 +122,15 @@ CREATE TABLE IF NOT EXISTS booking_log(
 
 # Rooms created the first time the system starts, so there is something to try.
 # Change them in the portal: Admin -> Rooms & halls.  Nothing here is fixed in code.
+# The last column is "needs the Head's approval".  Seminar halls do; classrooms
+# do not - a make-up class is the office's to confirm and should never reach him.
+# Any room can be changed afterwards in Admin -> Rooms & halls.
 SEED_ROOMS = [
     ("Seminar Hall",        "hall",      120, "Projector, AC, Mic, Podium", "Department of Mathematics", 1),
     ("Committee Room",      "hall",       30, "Projector, AC",              "Department of Mathematics", 1),
-    ("Classroom NC-141",    "classroom",  70, "Projector",                  "Nalanda Complex",           1),
-    ("Classroom NC-142",    "classroom",  70, "Projector",                  "Nalanda Complex",           1),
-    ("Tutorial Room MA-1",  "classroom",  25, "Whiteboard",                 "Department of Mathematics", 1),
+    ("Classroom NC-141",    "classroom",  70, "Projector",                  "Nalanda Complex",           0),
+    ("Classroom NC-142",    "classroom",  70, "Projector",                  "Nalanda Complex",           0),
+    ("Tutorial Room MA-1",  "classroom",  25, "Whiteboard",                 "Department of Mathematics", 0),
 ]
 # the office is the usual key-holder; change it per room in Admin -> Rooms & halls
 SEED_CUSTODIAN = "Department office" 
@@ -142,6 +145,12 @@ DEFAULTS = {
     "requester_types": ["faculty", "adjunct", "postdoc", "project", "scholar", "staff"],  # may book from inside the portal
     "auto_until": "",            # HoD: auto-approve only up to this date ("" = no limit)
     "office_auto_confirm": False,  # office: confirm the moment the HoD approves, without a second click
+    # The Head handing room approvals to the office altogether. With this on he
+    # is sent nothing and asked nothing: the moment the office forwards, the
+    # booking is approved in his name and lands in their "Ready to confirm".
+    # He can only switch it on when nothing is still waiting for him, so no
+    # request is ever stranded on a page he has stopped visiting.
+    "hod_approval_off": False,
     "tz_offset_min": 330,        # India Standard Time, for working out "today"
     "blackout": [],              # [{"from":"2026-12-24","to":"2027-01-01","reason":"Institute holidays"}]
     "public_show_name": True,    # show who booked it on the public calendar
@@ -180,6 +189,19 @@ NEW_COLUMNS = [
 NEW_ROOM_COLUMNS = [("custodian", "TEXT NOT NULL DEFAULT ''")]
 
 
+def tidy_classrooms():
+    """
+    Installs made before 25 Nov 2026 had every room needing the Head's approval,
+    classrooms included. Put that right once, and remember that it was done so a
+    deliberate choice afterwards is never overwritten.
+    """
+    c = cfg()
+    if c.get("classrooms_office_only"):
+        return
+    S.q("UPDATE rooms SET needs_hod=0 WHERE kind='classroom'")
+    save_cfg({"classrooms_office_only": True})
+
+
 def init_db():
     """Called by server.init_db(). Safe to run again and again."""
     S.db().executescript(SCHEMA)
@@ -197,6 +219,7 @@ def init_db():
             S.q("INSERT INTO rooms(name,kind,capacity,facilities,location,custodian,needs_hod,sort,created)"
                 " VALUES(?,?,?,?,?,?,?,?,?)",
                 (name, kind, cap, fac, loc, SEED_CUSTODIAN, hod, i, S.iso(S.now())))
+    tidy_classrooms()
 
 
 def cfg():
@@ -586,7 +609,8 @@ def booking_public(b, who=False):
            "status": b["status"], "status_label": status_label(b),
            "confirmed": bool(b["confirmed"]),
            "awaiting_office": b["status"] == "approved" and not b["confirmed"],
-           "auto": bool(b["auto"]), "note": b["decision_note"], "created": b["created"]}
+           "auto": bool(b["auto"]), "note": b["decision_note"], "created": b["created"],
+           "decided_at": b["decided_at"] or ""}
     out["advisor"] = b["advisor_name"]
     if who:
         # office and HoD only: the real person, their roll number and phone
@@ -1017,12 +1041,71 @@ def office_checks(b, room):
     comp = clashes(b["room_id"], b["on_date"], b["t_start"], b["t_end"], WAITING, b["id"])
     if comp:
         add("warn", "Other requests for the same slot",
-            ", ".join((x["ref"] or "#" + str(x["id"])) + " (" + user_label(x["user_id"]) + ")" for x in comp))
+            ", ".join("{} ({})".format(x["ref"] or "#" + str(x["id"]),
+                                       x["requester_name"] or user_label(x["user_id"]) or "name not given")
+                      for x in comp))
 
     n = no_show_count(b["requester_email"])
     if n:
         add("warn", "Earlier no-shows", "{} earlier booking(s) by this person were not used.".format(n))
     return out
+
+
+def competitors(b):
+    """
+    Other live requests for the same room whose time overlaps this one, oldest
+    request first - "who asked before whom" is the thing the office wants to see.
+    """
+    rows = clashes(b["room_id"], b["on_date"], b["t_start"], b["t_end"], WAITING, b["id"])
+    rows = sorted(rows, key=lambda r: (r["created"] or "", r["id"]))
+    out = []
+    for r in rows:
+        item = booking_public(r, who=True)
+        item["asked"] = r["created"]
+        item["earlier"] = bool((r["created"] or "") < (b["created"] or ""))
+        out.append(item)
+    return out
+
+
+def same_day(b):
+    """Other live requests for the same room that day which do NOT overlap."""
+    over = {x["id"] for x in competitors(b)}
+    rows = S.q("SELECT * FROM bookings WHERE room_id=? AND on_date=? AND id<>?"
+               " AND status IN ({}) ORDER BY t_start".format(",".join("?" * len(WAITING))),
+               tuple([b["room_id"], b["on_date"], b["id"]] + list(WAITING))).fetchall()
+    return [booking_public(r, who=True) for r in rows if r["id"] not in over]
+
+
+def refuse_others(req, u, b, ids, note):
+    """
+    The office giving the slot to one request and turning the rest down in the
+    same action. Each applicant gets their own e-mail - never a group one, so
+    nobody sees anybody else's address.
+    """
+    note = text(note, 500, "The reason")
+    if not note:
+        raise S.ApiError(400, "Write the reason the others are being refused. "
+                              "It is e-mailed to each of them.")
+    allowed = {x["id"] for x in competitors(b)}
+    turned = []
+    at = S.iso(S.now())
+    for i in ids[:50]:
+        try:
+            i = int(i)
+        except (TypeError, ValueError):
+            continue
+        if i not in allowed:
+            continue                       # only ever the ones shown on screen
+        o = booking_row(i)
+        if o["status"] not in WAITING:
+            continue
+        S.q("UPDATE bookings SET status='rejected',decided_by=?,decided_at=?,decision_note=?,updated=?"
+            " WHERE id=?", (u["id"], at, note, at, o["id"]))
+        log(o["id"], u["email"], "refused: the slot went to " + (b["ref"] or "another request"), note)
+        S.audit(u["email"], "booking.refuse_other", o["ref"], "slot given to " + (b["ref"] or ""), req.ip)
+        mail_decided(booking_row(o["id"]), room_row(o["room_id"]), False, note)
+        turned.append(o["ref"] or o["id"])
+    return turned
 
 
 def blockers(b, room):
@@ -1036,7 +1119,10 @@ def api_office_check(req, bid):
     room = room_row(b["room_id"])
     checks = office_checks(b, room)
     ok, why = auto_check(b, room)
+    rivals = competitors(b)
     return {"booking": booking_public(b, who=True), "room": room_public(room), "checks": checks,
+            "competitors": rivals, "same_day": same_day(b),
+            "hod_off": bool(cfg()["hod_approval_off"]),
             "stop": any(c["level"] == "stop" for c in checks),
             "warn": sum(1 for c in checks if c["level"] == "warn"),
             "needs_hod": bool(room["needs_hod"]),
@@ -1046,8 +1132,10 @@ def api_office_check(req, bid):
 
 def api_queue(req):
     require_desk(req)
+    # Oldest request first: "who asked before whom" is what decides a contested
+    # slot, so that is the order the desk sees them in.
     rows = S.q("SELECT * FROM bookings WHERE status IN ('pending','returned','forwarded')"
-               " ORDER BY on_date, t_start").fetchall()
+               " ORDER BY created, id").fetchall()
     out = []
     for b in rows:
         item = booking_public(b, who=True)
@@ -1073,6 +1161,7 @@ def api_queue(req):
             "upcoming": [booking_public(b, who=True) for b in upcoming],
             "no_address": missing_addresses(), "register": register_size(),
             "office_auto_confirm": bool(cfg()["office_auto_confirm"]),
+            "hod_approval_off": bool(cfg()["hod_approval_off"]),
             "counts": {"pending": sum(1 for b in rows if b["status"] == "pending"),
                        "forwarded": sum(1 for b in rows if b["status"] == "forwarded"),
                        "returned": sum(1 for b in rows if b["status"] == "returned"),
@@ -1090,7 +1179,13 @@ def api_office(req, bid):
     # The Head has approved it and it is sitting in "Ready to confirm". This is
     # the office letting it out: it sets confirmed=1 and sends the e-mail.
     if action == "confirm" and b["status"] == "approved" and not b["confirmed"]:
-        return confirm_booking(req, b, u, note)
+        # Others may still be waiting for this slot; the office can turn them
+        # down in the same click, and each is told why.
+        turned = refuse_others(req, u, b, d.get("refuse") or [], d.get("refuse_note")) \
+            if d.get("refuse") else []
+        out = confirm_booking(req, b, u, note)
+        out["refused"] = turned
+        return out
     # Otherwise it is still an open request. The office can send it back or
     # refuse it even after it has gone to the Head.
     if b["status"] not in ("pending", "returned", "forwarded"):
@@ -1121,24 +1216,41 @@ def api_office(req, bid):
         if stop:
             raise S.ApiError(409, "This cannot go forward yet. " +
                              "  ".join(c["what"] + ": " + c["detail"] for c in stop))
+        # The office may turn down the other people who asked for this slot in
+        # the same click. Done before the slot is taken, so they are told why.
+        turned = refuse_others(req, u, b, d.get("refuse") or [], d.get("refuse_note")) \
+            if d.get("refuse") else []
 
     if action == "confirm":
         if room["needs_hod"]:
             raise S.ApiError(400, "{} needs the Head's approval. Use Forward to the HoD.".format(room["name"]))
-        return approve(req, b, u, note, auto=False, by_office=True)
+        out = approve(req, b, u, note, auto=False, by_office=True)
+        out["refused"] = turned
+        return out
 
     if action == "forward":
         if not room["needs_hod"]:
             # nothing to forward: this room is the office's to confirm
-            return approve(req, b, u, note, auto=False, by_office=True)
+            out = approve(req, b, u, note, auto=False, by_office=True)
+            out["refused"] = turned
+            return out
+        if cfg()["hod_approval_off"]:
+            # The Head has handed room approvals over. Forwarding approves it in
+            # his name on the spot; he is sent nothing and asked nothing.
+            out = approve(req, b, u, note or "approved under the Head's standing instruction",
+                          auto=True, by_office=True)
+            out["refused"] = turned
+            return out
         ok, why = auto_check(b, room)
         if ok:
-            return approve(req, b, u, note, auto=True, by_office=True)
+            out = approve(req, b, u, note, auto=True, by_office=True)
+            out["refused"] = turned
+            return out
         S.q("UPDATE bookings SET status='forwarded',forwarded_by=?,forwarded_at=?,updated=? WHERE id=?",
             (u["id"], at, at, b["id"]))
         log(b["id"], u["email"], "forwarded to HoD", note or why)
         mail_forwarded(booking_row(b["id"]), room, user_label(u["id"]))
-        return {"ok": True, "status": "forwarded", "why": why}
+        return {"ok": True, "status": "forwarded", "why": why, "refused": turned}
 
     raise S.ApiError(400, "Unknown action.")
 
@@ -1146,6 +1258,65 @@ def api_office(req, bid):
 # ---------------------------------------------------------------------------
 # 11. API - the Head of the Department
 # ---------------------------------------------------------------------------
+def api_office_many(req):
+    """
+    The office clearing a whole date in one click.
+
+      action = "forward"  send every request waiting on their desk for that date
+                          to the Head (the checklist still runs on each one, and
+                          anything that fails is left behind with the reason)
+      action = "confirm"  let out every booking the Head has already approved
+                          for that date
+    """
+    u = require_office(req)
+    d = req.json()
+    action = str(d.get("action") or "")
+    note = text(d.get("note"), 500, "The note")
+    day = ymd(str(d.get("date") or "").strip())
+    room_id = d.get("room")
+    where, args = [], []
+    if action == "forward":
+        where.append("status IN ('pending','returned')")
+    elif action == "confirm":
+        where.append("status='approved' AND confirmed=0")
+    else:
+        raise S.ApiError(400, "Unknown action.")
+    where.append("on_date=?"); args.append(day)
+    if str(room_id or "").strip().isdigit():
+        where.append("room_id=?"); args.append(int(room_id))
+    rows = S.q("SELECT * FROM bookings WHERE " + " AND ".join(where) +
+               " ORDER BY created, id", tuple(args)).fetchall()
+
+    done, held = [], []
+    for b in rows[:100]:
+        b = booking_row(b["id"])                      # re-read: earlier ones may have changed it
+        room = room_row(b["room_id"])
+        stop = blockers(b, room)
+        if stop:
+            held.append({"ref": b["ref"], "why": stop[0]["what"] + ": " + stop[0]["detail"]})
+            continue
+        try:
+            if action == "confirm":
+                confirm_booking(req, b, u, note)
+            elif not room["needs_hod"] or cfg()["hod_approval_off"]:
+                approve(req, b, u, note, auto=bool(room["needs_hod"]), by_office=True)
+            else:
+                ok, why = auto_check(b, room)
+                if ok:
+                    approve(req, b, u, note, auto=True, by_office=True)
+                else:
+                    at = S.iso(S.now())
+                    S.q("UPDATE bookings SET status='forwarded',forwarded_by=?,forwarded_at=?,updated=?"
+                        " WHERE id=?", (u["id"], at, at, b["id"]))
+                    log(b["id"], u["email"], "forwarded to HoD", note or why)
+                    mail_forwarded(booking_row(b["id"]), room, user_label(u["id"]))
+            done.append(b["ref"])
+        except S.ApiError as e:
+            held.append({"ref": b["ref"], "why": e.message})
+    S.audit(u["email"], "booking.bulk_" + action, day, "{} done, {} held".format(len(done), len(held)), req.ip)
+    return {"ok": True, "done": done, "held": held, "date": day}
+
+
 def approve(req, b, u, note, auto=False, by_office=False, confirm_now=None):
     """
     The only place a booking becomes 'approved'.
@@ -1230,13 +1401,14 @@ def confirm_booking(req, b, u, note=""):
 def api_hod(req):
     require_desk(req)
     c = cfg()
-    waiting = S.q("SELECT * FROM bookings WHERE status='forwarded' ORDER BY on_date, t_start").fetchall()
+    waiting = S.q("SELECT * FROM bookings WHERE status='forwarded' ORDER BY created, id").fetchall()
     recent = S.q("SELECT * FROM bookings WHERE status IN ('approved','rejected') ORDER BY id DESC LIMIT 40").fetchall()
     out = []
     for b in waiting:
         item = booking_public(b, who=True)
         room = room_row(b["room_id"])
-        item["competing"] = [user_label(x["user_id"]) + " (" + x["ref"] + ")"
+        item["competing"] = ["{} ({})".format(x["requester_name"] or user_label(x["user_id"]) or "name not given",
+                                              x["ref"])
                              for x in clashes(b["room_id"], b["on_date"], b["t_start"], b["t_end"], WAITING, b["id"])]
         item["room_capacity"] = room["capacity"]
         out.append(item)
@@ -1244,16 +1416,33 @@ def api_hod(req):
     # able to see this without asking anybody.
     unconfirmed = S.q("SELECT * FROM bookings WHERE status='approved' AND confirmed=0"
                       " ORDER BY on_date, t_start").fetchall()
-    # dates with something waiting, so "approve everything on this day" is one click
-    days = []
-    for d in sorted(set(b["on_date"] for b in waiting)):
-        days.append({"date": d, "pretty": pretty_date(d),
-                     "count": sum(1 for b in waiting if b["on_date"] == d)})
-    return {"waiting": out, "days": days,
+    # dates with something waiting, so "approve everything on this day" is one
+    # click - and the same per room, so he can clear just the Seminar Hall
+    days, rooms_waiting = [], []
+    for day in sorted(set(b["on_date"] for b in waiting)):
+        days.append({"date": day, "pretty": pretty_date(day),
+                     "count": sum(1 for b in waiting if b["on_date"] == day)})
+    for rid in sorted(set(b["room_id"] for b in waiting)):
+        r = room_row(rid)
+        rooms_waiting.append({"id": rid, "name": r["name"],
+                              "count": sum(1 for b in waiting if b["room_id"] == rid)})
+
+    # What he has decided, in two lists rather than one mixed one. Capped: the
+    # whole history, as far back as it goes, is in Booking records.
+    approved = S.q("SELECT * FROM bookings WHERE status='approved'"
+                   " ORDER BY decided_at DESC, id DESC LIMIT 50").fetchall()
+    rejected = S.q("SELECT * FROM bookings WHERE status='rejected'"
+                   " ORDER BY decided_at DESC, id DESC LIMIT 50").fetchall()
+    return {"waiting": out, "days": days, "rooms_waiting": rooms_waiting,
             "awaiting_office": [booking_public(b, who=True) for b in unconfirmed],
+            "approved": [booking_public(b, who=True) for b in approved],
+            "rejected": [booking_public(b, who=True) for b in rejected],
             "recent": [booking_public(b, who=True) for b in recent],
             "rooms": [room_public(r) for r in S.q("SELECT * FROM rooms ORDER BY sort, name").fetchall()],
             "office_auto_confirm": bool(c["office_auto_confirm"]),
+            "hod_approval_off": bool(c["hod_approval_off"]),
+            "can_switch_off": not waiting,
+            "auto_rooms": [r["id"] for r in S.q("SELECT id FROM rooms WHERE auto_ok=1").fetchall()],
             "auto_until": c["auto_until"], "max_hours": c["max_hours"], "today": today_local()}
 
 
@@ -1286,10 +1475,16 @@ def api_decide_many(req):
     note = text(d.get("note"), 500, "The note")
     ids = [int(x) for x in (d.get("ids") or [])][:100]
     day = str(d.get("date") or "").strip()
-    if day and not ids:
-        # "approve everything waiting for this date"
-        ids = [r["id"] for r in S.q("SELECT id FROM bookings WHERE status='forwarded' AND on_date=?"
-                                    " ORDER BY t_start", (ymd(day),)).fetchall()][:100]
+    room_id = d.get("room")
+    if not ids and (day or room_id):
+        # "approve everything waiting" - for one date, for one room, or for both
+        where, args = ["status='forwarded'"], []
+        if day:
+            where.append("on_date=?"); args.append(ymd(day))
+        if str(room_id or "").strip().isdigit():
+            where.append("room_id=?"); args.append(int(room_id))
+        ids = [r["id"] for r in S.q("SELECT id FROM bookings WHERE " + " AND ".join(where) +
+                                    " ORDER BY on_date, t_start", tuple(args)).fetchall()][:100]
     done, failed = [], []
     for i in ids:
         try:
@@ -1908,9 +2103,21 @@ def api_settings(req):
     d = req.json()
     if ("auto_rooms" in d or "auto_until" in d) and not may_hod(u):
         raise S.ApiError(403, "Standing approval is the Head's to give. Only his account can change it.")
+    if "hod_approval_off" in d:
+        if not may_hod(u):
+            raise S.ApiError(403, "Only the Head of the Department can hand room approvals to the office.")
+        if d.get("hod_approval_off"):
+            waiting = S.q1("SELECT COUNT(*) c FROM bookings WHERE status='forwarded'")["c"]
+            if waiting:
+                raise S.ApiError(409,
+                    "{} request(s) are still waiting for you. Decide those first, then you can hand "
+                    "room approvals to the office - otherwise they would be left on a page you have "
+                    "stopped looking at.".format(waiting))
     changes = {}
     if "office_auto_confirm" in d:
         changes["office_auto_confirm"] = bool(d.get("office_auto_confirm"))
+    if "hod_approval_off" in d:
+        changes["hod_approval_off"] = bool(d.get("hod_approval_off"))
     if not boss:
         if set(d) - {"office_auto_confirm"}:
             raise S.ApiError(403, "Only the Head of the Department or an admin can change the other "
@@ -1994,6 +2201,7 @@ ROUTE_TABLE = [
     ("GET",    r"/api/bookings/availability",  api_availability),
     ("GET",    r"/api/bookings/mine",          api_mine),
     ("GET",    r"/api/bookings/queue",         api_queue),
+    ("POST",   r"/api/bookings/office-many",   api_office_many),
     ("GET",    r"/api/bookings/records",       api_records),
     ("GET",    r"/api/bookings/records/(\d+)", api_record),
     ("GET",    r"/api/bookings/(\d+)/check",    api_office_check),

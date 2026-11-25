@@ -83,6 +83,29 @@ steps, done by two different people.**
                                  Cc:  the faculty advisor, if one was named
 ```
 
+### Seminar halls only
+
+The Head approves **halls**. Classrooms are the office's to confirm and never
+reach him - a make-up class is not a decision for the Head of the Department.
+It is a tick per room (`needs_hod`) in Admin -> Rooms & halls, so any room can
+be moved either way; what changed on 25 Nov 2026 is the starting point, which
+used to send classrooms to him as well.
+
+### If the Head would rather not be involved at all
+
+Approvals -> **"Let the department office handle room approvals."** With it on
+he is sent nothing and asked nothing: the moment the office forwards a hall it
+is approved in his name and lands in their "Ready to confirm". Everything is
+still recorded against him in the log and in Booking records, and he can take it
+back whenever he likes.
+
+He can only switch it **on when nothing is still waiting for him**. Otherwise
+those requests would sit on a page he has stopped visiting. The tick box is
+disabled until his list is clear, and says so.
+
+This is not the same as standing approval. Standing approval is per hall and
+only covers routine requests; this is a blanket handover of the whole step.
+
 ### Why the two steps
 
 The Head approving means *"the department has no objection"*. The office confirming
@@ -111,6 +134,43 @@ owns it (`office_auto_confirm` in the booking settings).
   so he can see what has stalled without asking.
 * **System health** (Admin) turns it into a warning if anything has been sitting
   unconfirmed for more than two days.
+
+### Two people after the same slot
+
+A double booking cannot happen: a request for a time already taken is refused
+outright, and approval re-checks inside a locked transaction. What *can* happen
+is two people asking for the same free slot before either is decided - allowed
+on purpose, because a request that might be refused must not lock a hall for
+days.
+
+So the office chooses. The checklist lists everyone else who wants that slot,
+**oldest request first**, marks who asked first, and separately lists other
+requests for that room that day which do not overlap. Each overlapping one has
+a tick box: tick it and it is refused in the same click that gives the slot
+away. One reason is typed once and **each applicant is e-mailed separately** -
+never a group message, so nobody sees anybody else's address. The reason is
+required; without it the refusals are rejected.
+
+Only requests actually shown on the screen can be refused this way
+(`refuse_others()` checks the list against `competitors()` again), so a
+hand-made request cannot sweep up bookings the office never saw.
+
+Both queues are ordered **oldest request first** for the same reason, and each
+row shows when it was asked.
+
+### Clearing several at once
+
+| Who | Where | What it does |
+|---|---|---|
+| Head | Approvals | **Clear a whole day** - one button per date waiting |
+| Head | Approvals | **Or a whole room** - one button per room waiting |
+| Head | Approvals | Tick several and **Approve selected** |
+| Office | Booking requests | One button per date: **forward** everything waiting, or **confirm** everything the Head has approved |
+
+The office's buttons run the full checklist on each booking separately.
+Anything that fails - a clash, no e-mail address, a date gone by - is left
+behind and reported with the reason, so a bulk click can never wave through
+what a single click would have stopped.
 
 ### The checklist before anything leaves the office
 

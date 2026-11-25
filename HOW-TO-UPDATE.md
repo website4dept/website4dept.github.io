@@ -238,6 +238,31 @@ and the note each of them left.
 This is where to look months later. The Head's Approvals page only keeps the
 last five decisions, on purpose.
 
+### When two people want the same room at the same time
+
+They are both allowed to ask - the slot is only taken when one is approved.
+When the office forwards or confirms one of them, the checklist lists everyone
+else who wants that slot, **oldest request first**, and marks who asked first.
+Tick the ones to turn down, type one reason, and press the button: the slot
+goes to one and each of the others gets their own e-mail with that reason. The
+reason is required.
+
+### Clearing a lot at once
+
+* **Head**, Approvals: one button per date, one per room, or tick several.
+* **Office**, Booking requests: one button per date - forward everything
+  waiting, or confirm everything the Head has approved.
+
+The office's buttons check every booking separately and leave behind anything
+that fails, telling you which and why.
+
+### If the Head would rather not approve bookings at all
+
+Approvals -> **"Let the department office handle room approvals."** Forwarding
+a hall then approves it immediately in his name and sends it to the office to
+confirm. He can only turn this on when nothing is waiting for him, and he can
+turn it off again whenever he likes.
+
 ### Before forwarding: the checklist
 
 Pressing **Check & forward** (or **Check & confirm**) opens a short list before

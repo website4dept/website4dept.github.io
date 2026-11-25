@@ -32,6 +32,32 @@
     'You can see everything on this page, but deciding a booking needs the ' + whose + '.</div>';
 
   // The office queue can be opened by the Head as well, so say whose desk it is.
+  /* The Head handing room approvals to the office altogether. He can only turn
+     it on when nothing is still waiting for him, so nothing is ever stranded on
+     a page he has stopped visiting. */
+  const handoverCard = d =>
+    !canHod() ? (d.hod_approval_off
+      ? '<div class="bk-watch">The Head has handed room approvals to the department office.</div>' : '') :
+    '<div class="card bk-switch"><label class="check">' +
+      '<input type="checkbox" id="bkHodOff"' + (d.hod_approval_off ? ' checked' : '') +
+      (d.hod_approval_off || d.can_switch_off ? '' : ' disabled') + '> ' +
+      '<span><strong>Let the department office handle room approvals</strong>' +
+      '<small>With this on you are sent nothing and asked nothing: the moment the office ' +
+      'forwards a hall it is approved in your name and goes to them to confirm. Everything is ' +
+      'still recorded, and you can take it back here at any time.' +
+      (!d.hod_approval_off && !d.can_switch_off
+        ? '<br><strong class="bk-warn">Decide the requests waiting above first \u2014 ' +
+          'they would be left on a page you have stopped looking at.</strong>'
+        : '') +
+      '</small></span></label></div>';
+
+  const handover = d =>
+    !d.hod_approval_off ? '' :
+    '<div class="bk-watch"><strong>The Head has handed room approvals to the office.</strong> ' +
+    'Forwarding a hall now approves it on the spot in his name and drops it straight into ' +
+    '\u201cReady to confirm\u201d. He is not sent anything. He can take it back at any time ' +
+    'from his Approvals page.</div>';
+
   const queueNote = () =>
     canOffice() ? '' :
     watchOnly() ? watchNote('department office account') :
@@ -58,6 +84,56 @@
      Everything in it is checked again on the server, so a stale page cannot
      wave anything through. */
   const MARK = {ok: '✓', warn: '!', stop: '✕'};
+
+  /* The queues are in the order people asked, so show when that was. */
+  function askedAt(iso){
+    if (!iso) return '\u2014';
+    const d = new Date(iso);
+    if (isNaN(d)) return '\u2014';
+    return d.toLocaleDateString('en-GB', {day: '2-digit', month: 'short'}) + ', ' +
+           d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  }
+  /* Two people wanting the same room at the same time is allowed on purpose:
+     a request that might be refused must not lock a hall for days. The slot is
+     taken only when one of them is approved - so this is where the office
+     chooses, and can turn the others down in the same click. Oldest request
+     first, because that is usually who should get it. */
+  function stamp(t){ const d = new Date(t); return isNaN(d) ? '' : d.toLocaleString(); }
+
+  function rivalBlock(d, next){
+    const rivals = d.competitors || [];
+    const others = d.same_day || [];
+    if (!rivals.length && !others.length) return '';
+    const act = next === 'look' ? '' :
+      '<label class="bk-reason"><span>Why they are being refused ' +
+      '<small>(e-mailed to each of them separately)</small></span>' +
+      '<input type="text" id="bkWhy" maxlength="300" ' +
+      'placeholder="The room was given to an earlier request for the same slot."></label>';
+    return '<div class="bk-rivals">' +
+      (rivals.length
+        ? '<h4>' + rivals.length + ' other request' + (rivals.length === 1 ? '' : 's') +
+          ' for this slot</h4>' +
+          '<p class="hint">Taking this slot leaves them with nothing. Tick any you want to ' +
+          'turn down at the same time; leave them unticked to decide later.</p>' +
+          '<ul class="bk-rivlist">' + rivals.map(r =>
+            '<li><label class="check">' +
+            (next === 'look' ? '' : '<input type="checkbox" class="bk-rival" value="' + r.id + '">') +
+            '<span><strong>' + esc(r.ref) + '</strong> &middot; ' + esc(r.by) +
+            ' &middot; ' + esc(r.start) + '\u2013' + esc(r.end) +
+            (r.earlier ? ' <em class="bk-first">asked first</em>' : '') +
+            '<small>' + esc(r.title) + ' &middot; asked ' + esc(stamp(r.asked)) + '</small>' +
+            '</span></label></li>').join('') + '</ul>' + act
+        : '') +
+      (others.length
+        ? '<h4>Also asked for this room that day</h4>' +
+          '<p class="hint">These do not overlap, so they are not affected.</p>' +
+          '<ul class="bk-rivlist is-quiet">' + others.map(r =>
+            '<li><span><strong>' + esc(r.ref) + '</strong> &middot; ' + esc(r.by) +
+            ' &middot; ' + esc(r.start) + '\u2013' + esc(r.end) + '</span></li>').join('') + '</ul>'
+        : '') +
+      '</div>';
+  }
+
   async function checkPanel(id, next, after){
     const {api, $, toast} = ready();
     const box = $('#bkCheckBox');
@@ -80,6 +156,7 @@
         '<li class="is-' + c.level + '"><span class="bk-mark">' + MARK[c.level] + '</span>' +
         '<span><strong>' + esc(c.what) + '</strong>' +
         (c.detail ? '<small>' + esc(c.detail) + '</small>' : '') + '</span></li>').join('') + '</ul>' +
+      rivalBlock(d, next) +
       (next !== 'confirm' && d.auto && d.auto.ok
         ? '<p class="hint">The Head’s standing approval covers this one, so forwarding approves it ' +
           'at once' + (d.office_auto_confirm ? ' and it goes straight out to the person who asked.'
@@ -94,16 +171,40 @@
           : '<button class="btn btn-maroon" data-go="' + id + '" data-next="' + next + '">' + label + '</button>') +
         '<button class="btn btn-light" id="bkCheckClose">Close</button></div></div>';
     $('#bkCheckClose').addEventListener('click', () => { box.innerHTML = ''; });
+
+    // The button says what it is about to do, so nobody refuses three people by
+    // accident: it only mentions them once boxes are ticked.
+    const goBtn = box.querySelector('[data-go]');
+    const relabel = () => {
+      if (!goBtn) return;
+      const n = box.querySelectorAll('.bk-rival:checked').length;
+      goBtn.textContent = n ? label + ', and refuse ' + n + ' other' + (n === 1 ? '' : 's')
+                            : label;
+      goBtn.classList.toggle('btn-danger', n > 0);
+      goBtn.classList.toggle('btn-maroon', n === 0);
+    };
+    box.querySelectorAll('.bk-rival').forEach(cb => cb.addEventListener('change', relabel));
+    relabel();
     const go = box.querySelector('[data-go]');
     if (go) go.addEventListener('click', async () => {
       go.disabled = true;
+      const ticked = Array.from(box.querySelectorAll('.bk-rival:checked')).map(x => Number(x.value));
+      const why = $('#bkWhy') ? $('#bkWhy').value.trim() : '';
+      if (ticked.length && !why){
+        go.disabled = false;
+        return toast('Write why the other requests are being refused \u2014 it goes to each of them.', true);
+      }
       try {
-        const r = await api('POST', '/bookings/' + id + '/office', {action: next, note: ''});
+        const body = {action: next, note: ''};
+        if (ticked.length){ body.refuse = ticked; body.refuse_note = why; }
+        const r = await api('POST', '/bookings/' + id + '/office', body);
         toast(r.confirmed ? 'Confirmed. The e-mail has gone to the person who asked'
                             + (b.supervisor ? ', with a copy to ' + b.supervisor + ' and the office.' : ' and the office.')
             : r.status === 'approved' ? 'Approved under the Head’s standing approval. It is now in '
                                         + '“Ready to confirm” — nothing has been sent yet.'
             : 'Forwarded to the Head of the Department.');
+        if (r.refused && r.refused.length)
+          toast(r.refused.length + ' other request(s) refused and told why: ' + r.refused.join(', '));
         box.innerHTML = '';
         after();
       } catch (err){ go.disabled = false; toast(err.message, true); }
@@ -232,7 +333,8 @@
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th>' +
       '<th>Purpose</th><th>State</th><th></th></tr></thead><tbody>' +
       (list.length ? list.map(b =>
-        '<tr><td>' + when(b) + '<br><small>' + esc(b.ref) + '</small></td>' +
+        '<tr><td>' + when(b) + '<br><small>' + esc(b.ref) + '</small>' +
+          '<br><small class="bk-asked">asked ' + askedAt(b.created) + '</small></td>' +
         '<td>' + esc(b.room) + '</td>' +
         '<td>' + esc(b.title) + (b.note ? '<br><small>' + esc(b.note) + '</small>' : '') + '</td>' +
         '<td>' + chip(b) + '</td>' +
@@ -326,12 +428,32 @@
           : '<button class="btn btn-light btn-sm" data-check="' + b.id + '" data-next="look">See the checklist</button>') +
         '<button class="btn btn-danger btn-sm" data-revoke="' + b.id + '">Withdraw</button></td></tr>';
 
+    // Dates with something the office can do in one go: requests to forward,
+    // and bookings the Head has approved that are waiting to be let out.
+    const byDate = {};
+    const bump = (iso, key) => {
+      byDate[iso] = byDate[iso] || {forward: 0, confirm: 0};
+      byDate[iso][key]++;
+    };
+    (d.queue || []).filter(b => b.status === 'pending' || b.status === 'returned')
+      .forEach(b => bump(b.date, 'forward'));
+    (d.to_confirm || []).forEach(b => bump(b.date, 'confirm'));
+    // One button per date. Confirming comes first when there is any to confirm,
+    // because that is the step somebody is actually waiting on.
+    const dates = Object.keys(byDate).sort().map(iso => {
+      const v = byDate[iso];
+      const what = v.confirm ? 'confirm' : 'forward';
+      const n = v.confirm || v.forward;
+      return {date: iso, pretty: dayText(iso), what: what,
+              label: n + ' to ' + what};
+    });
+
     $('#view').innerHTML = head('Booking requests',
         'Every room request lands here first. Check the details and that the room is really free, ' +
         'then forward a seminar hall to the Head of the Department or confirm a classroom yourself. ' +
         'The Head is only e-mailed once you forward. When he approves, the booking comes back to you ' +
         'in “Ready to confirm” — nothing reaches the person who asked until you confirm it.') +
-      queueNote() + empty + warn +
+      queueNote() + handover(d) + empty + warn +
       '<div class="stat-grid">' +
         '<div class="stat-card"><strong>' + c.pending + '</strong><span>waiting for you</span></div>' +
         '<div class="stat-card"><strong>' + c.forwarded + '</strong><span>with the Head, not yet approved</span></div>' +
@@ -341,6 +463,12 @@
         '<div class="stat-card"><strong>' + d.upcoming.length + '</strong><span>confirmed, still to come</span></div>' +
       '</div>' +
       '<div id="bkCheckBox"></div>' +
+      (dates.length
+        ? '<div class="bk-days"><span>Clear a whole day:</span>' + dates.map(x =>
+            '<button class="btn btn-light btn-sm" data-day="' + esc(x.date) + '" data-what="' +
+            x.what + '">' + esc(x.pretty) + ' \u00b7 ' + x.label + '</button>').join('') +
+          '</div>'
+        : '') +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th><th>Purpose</th>' +
         '<th>Asked by</th><th>State</th><th></th></tr></thead><tbody>' +
         (d.queue.length ? d.queue.map(row).join('') : '<tr><td colspan="6"><small>Nothing waiting. </small></td></tr>') +
@@ -378,6 +506,22 @@
 
     $$('[data-check]').forEach(btn => btn.addEventListener('click',
       () => checkPanel(Number(btn.dataset.check), btn.dataset.next, viewQueue)));
+
+    $$('[data-day]').forEach(btn => btn.addEventListener('click', async () => {
+      const what = btn.dataset.what;
+      if (!confirm((what === 'confirm' ? 'Confirm' : 'Forward') + ' everything for ' +
+                   btn.textContent.split('\u00b7')[0].trim() + '?\n\n' +
+                   'Each one is checked first. Anything that fails a check is left for you.')) return;
+      try {
+        const r = await api('POST', '/bookings/office-many', {action: what, date: btn.dataset.day, note: ''});
+        toast(r.done.length + ' ' + (what === 'confirm' ? 'confirmed' : 'forwarded') +
+              (r.held.length ? ', ' + r.held.length + ' left behind: ' +
+                               r.held.map(h => h.ref + ' (' + h.why + ')').join('; ')
+                             : '.'),
+              r.held.length > 0);
+        viewQueue();
+      } catch (err){ toast(err.message, true); }
+    }));
 
     const sw = $('#bkAutoConfirm');
     if (sw) sw.addEventListener('change', async () => {
@@ -682,6 +826,15 @@
             '<button class="btn btn-danger btn-sm" data-decide="reject" data-id="' + b.id + '">Reject</button>'
           : '') + '</td></tr>';
 
+    const waitingOnOffice = (d.awaiting_office || []).length;
+
+    // Clear everything waiting for one room, as well as for one date.
+    const roomBtns = (d.rooms_waiting || []).length && canHod()
+      ? '<div class="bk-days"><span>Or a whole room:</span>' + d.rooms_waiting.map(r =>
+          '<button class="btn btn-light btn-sm" data-room-approve="' + r.id + '">' +
+          esc(r.name) + ' (' + r.count + ')</button>').join('') + '</div>'
+      : '';
+
     const dayBtns = (d.days || []).length && canHod()
       ? '<div class="bk-days"><span>Clear a whole day:</span>' + d.days.map(x =>
           '<button class="btn btn-light btn-sm" data-day-approve="' + esc(x.date) + '">' +
@@ -696,7 +849,7 @@
           ? 'The office has asked for bookings to go out the moment you approve them.'
           : 'Your approval does not send anything on its own: the office confirms it afterwards, ' +
             'and that is what tells the person who asked. The list below shows what is still with them.')) +
-      watchNote('Head of the Department’s own account') + dayBtns +
+      watchNote('Head of the Department’s own account') + handoverCard(d) + dayBtns + roomBtns +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th><input type="checkbox" id="bkAll" aria-label="Select all"></th>' +
         '<th>Date &amp; time</th><th>Room</th><th>Purpose</th><th>Asked by</th><th></th></tr></thead><tbody>' +
         (d.waiting.length ? d.waiting.map(row).join('')
@@ -706,14 +859,33 @@
         ? '<div class="view-actions"><button class="btn btn-maroon" id="bkMany">Approve selected</button>' +
           '<button class="btn btn-light" id="bkManyNo">Reject selected</button></div>' : '') +
 
-      '<h3 class="bk-h3">Approved by you — waiting for the office to confirm</h3>' +
+      '<h3 class="bk-h3">Approved ' +
+        (waitingOnOffice ? '<small>(' + waitingOnOffice + ' still with the office)</small>' : '') +
+        '<a class="bk-more" href="#bkrecords">All booking records \u2192</a></h3>' +
       '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th>' +
-        '<th>Purpose</th><th>Asked by</th><th>State</th></tr></thead><tbody>' +
-        ((d.awaiting_office || []).length
-          ? d.awaiting_office.map(b => '<tr><td>' + when(b) + '<br><small>' + esc(b.ref) + '</small></td>' +
+        '<th>Purpose</th><th>Asked by</th><th>Decided</th><th>State</th>' +
+        (canHod() ? '<th></th>' : '') + '</tr></thead><tbody>' +
+        ((d.approved || []).length
+          ? d.approved.map(b => '<tr><td>' + when(b) + '<br><small>' + esc(b.ref) + '</small></td>' +
               '<td>' + esc(b.room) + '</td><td>' + esc(b.title) + '</td><td>' + esc(b.by) + '</td>' +
-              '<td>' + chip(b) + (b.auto ? '<br><small>standing approval</small>' : '') + '</td></tr>').join('')
-          : '<tr><td colspan="5"><small>The office has confirmed everything you have approved.</small></td></tr>') +
+              '<td><small>' + askedAt(b.decided_at || b.created) +
+                (b.auto ? '<br>standing approval' : '') + '</small></td>' +
+              '<td>' + chip(b) + '</td>' +
+              (canHod() ? '<td class="actions">' +
+                '<button class="btn btn-danger btn-sm" data-revoke="' + b.id + '">Withdraw</button></td>' : '') +
+              '</tr>').join('')
+          : '<tr><td colspan="7"><small>Nothing approved yet.</small></td></tr>') +
+        '</tbody></table></div>' +
+
+      '<h3 class="bk-h3">Rejected</h3>' +
+      '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th>' +
+        '<th>Purpose</th><th>Asked by</th><th>Reason given</th></tr></thead><tbody>' +
+        ((d.rejected || []).length
+          ? d.rejected.map(b => '<tr><td>' + when(b) + '<br><small>' + esc(b.ref) + '</small></td>' +
+              '<td>' + esc(b.room) + '</td><td>' + esc(b.title) + '</td><td>' + esc(b.by) + '</td>' +
+              '<td>' + (b.note ? esc(b.note) : '<small>no reason recorded</small>') +
+                '<br><small>' + askedAt(b.decided_at || b.created) + '</small></td></tr>').join('')
+          : '<tr><td colspan="5"><small>Nothing rejected.</small></td></tr>') +
         '</tbody></table></div>' +
 
       '<div class="card bk-auto"><h3>Standing approval</h3>' +
@@ -730,25 +902,8 @@
             '<input type="date" name="auto_until" value="' + esc(d.auto_until || '') + '" min="' + esc(d.today) + '"></label>' +
         '</div><div class="view-actions"><button class="btn btn-maroon" type="submit">Save</button></div></form></div>' +
 
-      '<h3 class="bk-h3">The last few you decided ' +
-        '<a class="bk-more" href="#bkrecords">All booking records \u2192</a></h3>' +
-      '<div class="ptable-wrap"><table class="ptable"><thead><tr><th>Date &amp; time</th><th>Room</th><th>Purpose</th>' +
-        '<th>Asked by</th><th>Outcome</th><th></th></tr></thead><tbody>' +
-        (d.recent.length ? d.recent.slice(0, 5).map(b => '<tr><td>' + when(b) + '<br><small>' + esc(b.ref) + '</small></td>' +
-          '<td>' + esc(b.room) + '</td><td>' + esc(b.title) + '</td>' +
-          '<td>' + esc(b.by) + '</td><td>' + chip(b) + '</td>' +
-          '<td class="actions">' + (b.status === 'approved' ?
-            (b.confirmed
-              ? (b.on_board ? '<small>on the Notice Board</small>'
-                            : (canHod() || canOffice()
-                                ? '<button class="btn btn-light btn-sm" data-notice="' + b.id + '">Put on Notice Board</button>'
-                                : ''))
-              : '<small class="bk-withhod">the office has still to confirm it</small>') +
-            '<button class="btn btn-danger btn-sm" data-revoke="' + b.id + '">Withdraw</button>' : '') + '</td></tr>').join('')
-          : '<tr><td colspan="6"><small>Nothing decided yet.</small></td></tr>') +
-        '</tbody></table></div>' +
-      '<p class="hint">Only the five most recent are shown here. Everything ever booked, ' +
-        'searchable by reference number, is in <a href="#bkrecords">Booking records</a>.</p>';
+      '';
+
 
     const picked = () => $$('.bk-pick').filter(x => x.checked).map(x => Number(x.value));
     const all = $('#bkAll');
@@ -781,6 +936,28 @@
     };
     if ($('#bkMany')) $('#bkMany').addEventListener('click', () => many('approve'));
     if ($('#bkManyNo')) $('#bkManyNo').addEventListener('click', () => many('reject'));
+
+    const sw = $('#bkHodOff');
+    if (sw) sw.addEventListener('change', async () => {
+      try {
+        await api('PUT', '/bookings/settings', {hod_approval_off: sw.checked});
+        toast(sw.checked
+          ? 'The office will handle room approvals. You will not be asked again until you turn this off.'
+          : 'Room approvals come back to you.');
+        viewApprovals();
+      } catch (err){ sw.checked = !sw.checked; toast(err.message, true); }
+    });
+
+    $$('[data-room-approve]').forEach(btn => btn.addEventListener('click', async () => {
+      if (!confirm('Approve everything waiting for ' + btn.textContent.trim() + '?')) return;
+      try {
+        const r = await api('POST', '/bookings/decide-many',
+                            {room: Number(btn.dataset.roomApprove), action: 'approve', note: ''});
+        toast(r.done + ' approved' +
+              (r.failed.length ? ', ' + r.failed.length + ' could not be' : '.'), r.failed.length > 0);
+        viewApprovals();
+      } catch (err){ toast(err.message, true); }
+    }));
 
     $$('[data-day-approve]').forEach(btn => btn.addEventListener('click', async () => {
       const day = btn.dataset.dayApprove;
